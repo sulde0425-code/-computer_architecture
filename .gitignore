@@ -1,0 +1,92 @@
+# ============================================================
+#  LoongArch(LA32R) 五级流水 CPU 课程设计 —— Git 忽略规则
+#
+#  原则：只把"人写的"内容入库（RTL / 约束 / 测试程序 / 脚本 / 文档），
+#        一切可由工具重建的生成物一律不入库。
+#  按此规则：751 MB 工作目录 -> 约 25 MB 仓库，且工程可完整复现。
+# ============================================================
+
+# ---------- 1. Vivado 工程运行产物（最大头，约 590 MB）----------
+**/*.runs/
+**/*.cache/
+**/*.hw/
+**/*.ip_user_files/
+**/*.sim/
+**/*.srcs/utils_1/
+.Xil/
+xsim.dir/
+webtalk/
+webtalk_*.log
+*.jou
+*.log
+*.str
+*.backup.jou
+*.backup.log
+vivado_pid*.str
+ip_upgrade.log
+
+# ---------- 2. Vivado IP 生成物（.xci 是唯一真相，可一键重建）----------
+**/xilinx_ip/*/hdl/
+**/xilinx_ip/*/bd/
+**/xilinx_ip/*/doc/
+**/xilinx_ip/*/misc/
+**/xilinx_ip/*/example_design/
+**/xilinx_ip/*/simulation/
+**/xilinx_ip/*/synth/
+**/xilinx_ip/*/sim/
+**/xilinx_ip/*/*_sim_netlist.v
+**/xilinx_ip/*/*_sim_netlist.vhdl
+**/xilinx_ip/*/*.veo
+**/xilinx_ip/*/*.xci.xml
+**/xilinx_ip/*/inst_ram.mif
+**/xilinx_ip/*/*.coe
+
+# ---------- 3. 综合 / 实现 / 仿真二进制产物 ----------
+*.bit
+*.bin
+*.mcs
+*.dcp
+*.rpt
+*.rpt.bak
+*.wdb
+*.wcfg
+*.xpe
+*.pdi
+*.ltx
+*.pb
+*.xsim.*
+
+# ---------- 4. 测试镜像中的中间产物 ----------
+# 注意：gitignore 不支持行尾注释，注释必须独占一行
+# test.s 是反汇编文本，约 5 MB x 9 章
+for_test_obj/*/test.s
+# rom.vlog 可由 .coe 重建
+for_test_obj/*/rom.vlog
+# .mif 与 .coe 信息等价但体积 4 倍：仅保留当前主用章节 ex6，其余只留 .coe
+for_test_obj/*/inst_ram.mif
+!for_test_obj/ex6_obj/inst_ram.mif
+
+# ---------- 5. 换章脚本产生的自动备份 ----------
+**/.bak_*/
+
+# ---------- 6. 编辑器 / 系统杂项 ----------
+.slidep/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# ---------- 7. 辅助工作区：只保留构建脚本与项目技术笔记 ----------
+.workbuddy/backup/
+.workbuddy/tmp/
+.workbuddy/sim/exp*/
+.workbuddy/sim/mycpu_env/
+.workbuddy/sim/rtl_mycpu/
+.workbuddy/sim/synthchk/
+.workbuddy/sim/*.bit
+.workbuddy/sim/*.rpt
+.workbuddy/memory/2026-*.md
+
+# ---------- 8. 第三方教材 PDF（版权材料，不入库）----------
+# 如需纳入，注释掉下一行即可
+main.pdf

@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LA32R 五级流水线处理器 · 第 1–2 章讲义</title>
+<style>
+  :root{
+    --ink:#2C2C2A; --ink2:#5F5E5A; --ink3:#888780;
+    --line:#E3E1DA; --line2:#D3D1C7;
+    --bg:#FFFFFF; --bg2:#F7F6F2; --bg3:#F1EFE8;
+    --blue:#185FA5; --blue-bg:#E6F1FB;
+    --teal:#0F6E56; --teal-bg:#E1F5EE;
+    --amber:#854F0B; --amber-bg:#FAEEDA;
+    --purple:#534AB7; --purple-bg:#EEEDFE;
+    --red:#A32D2D; --red-bg:#FCEBEB;
+    --green:#3B6D11; --green-bg:#EAF3DE;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg3);color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       font-size:14.5px;line-height:1.75}
+  .wrap{max-width:940px;margin:0 auto;padding:32px 24px 80px}
+  header{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:28px 30px;margin-bottom:22px}
+  h1{margin:0 0 8px;font-size:23px;font-weight:600;letter-spacing:.3px}
+  .sub{color:var(--ink2);font-size:13.5px;margin:0}
+  h2{font-size:19px;font-weight:600;margin:34px 0 14px;padding-top:18px;border-top:1px solid var(--line2)}
+  h2:first-of-type{border-top:none;padding-top:0}
+  h3{font-size:16px;font-weight:600;margin:24px 0 10px}
+  h4{font-size:14.5px;font-weight:600;margin:18px 0 8px;color:var(--ink)}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;font-size:12.8px;
+       background:var(--bg3);padding:1px 5px;border-radius:4px;color:#3C3489}
+  pre{background:#FBFAF7;border:1px solid var(--line);border-left:3px solid var(--blue);
+      border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:12.8px;line-height:1.65;margin:12px 0}
+  pre code{background:none;padding:0;color:var(--ink);font-size:12.8px}
+  .cmt{color:#7A786F}
+  .kw{color:#993C1D;font-weight:600}
+  .sig{color:#185FA5;font-weight:600}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.2px;background:var(--bg)}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--bg3);font-weight:600;white-space:nowrap}
+  td.mono,th.mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:12.3px}
+  .box{border-radius:12px;padding:14px 18px;margin:16px 0;border:1px solid var(--line);background:var(--bg)}
+  .note{background:var(--blue-bg);border-color:#B5D4F4}
+  .warn{background:var(--amber-bg);border-color:#EF9F27}
+  .dang{background:var(--red-bg);border-color:#F09595}
+  .ok{background:var(--green-bg);border-color:#97C459}
+  .ask{background:var(--purple-bg);border-color:#AFA9EC}
+  .box b{font-weight:600}
+  .box p:first-child{margin-top:0}.box p:last-child{margin-bottom:0}
+  /* 位域排线图 */
+  .bits{display:flex;flex-wrap:wrap;gap:3px;margin:10px 0 6px;font-family:"SFMono-Regular",Consolas,monospace}
+  .bf{border:1px solid var(--line2);border-radius:4px;padding:4px 6px;font-size:11.4px;
+      background:var(--bg2);text-align:center;min-width:52px}
+  .bf .n{display:block;font-weight:600;color:var(--ink);font-size:11.8px}
+  .bf .r{display:block;color:var(--ink3);font-size:10.4px}
+  .bf.c1{background:var(--blue-bg);border-color:#85B7EB}
+  .bf.c2{background:var(--teal-bg);border-color:#5DCAA5}
+  .bf.c3{background:var(--amber-bg);border-color:#EF9F27}
+  .bf.c4{background:var(--purple-bg);border-color:#AFA9EC}
+  .bf.c5{background:var(--red-bg);border-color:#F09595}
+  .bf.c6{background:var(--green-bg);border-color:#97C459}
+  .bf.c0{background:#F1EFE8;border-color:#B4B2A9}
+  .fig{margin:18px 0;padding:14px;background:var(--bg);border:1px solid var(--line);border-radius:12px}
+  .fig svg{width:100%;height:auto;display:block}
+  .cap{font-size:12.4px;color:var(--ink3);margin-top:8px;text-align:center}
+  .tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:20px;
+       background:var(--bg3);color:var(--ink2);border:1px solid var(--line2);margin-right:4px}
+  .tag.ch1{background:var(--blue-bg);color:var(--blue);border-color:#85B7EB}
+  .tag.ch2{background:var(--teal-bg);color:var(--teal);border-color:#5DCAA5}
+  .tag.ch5{background:var(--amber-bg);color:var(--amber);border-color:#EF9F27}
+  .toc{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 22px}
+  .toc ol{margin:6px 0;padding-left:20px}
+  .toc a{color:var(--blue);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13.4px;margin:10px 0}
+  .kv .k{color:var(--ink2);white-space:nowrap}
+  hr{border:none;border-top:1px solid var(--line);margin:26px 0}
+  .center{text-align:center}
+  .small{font-size:12.8px;color:var(--ink2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>LA32R 五级流水线处理器 · 第 1–2 章讲义</h1>
+  <p class="sub">面向"计组基础薄弱、但要上台汇报"的同学 · 所有代码与信号均取自你工程里的真实 RTL<br>
+  对应指导书：第 1 章「流水线骨架」+ 第 2 章「指令相关与流水线冲突」</p>
+</header>
+
+<div class="toc">
+  <b>目录</b>
+  <ol>
+    <li><a href="#s0">学前预备：把流水线想成一条工厂流水线</a></li>
+    <li><a href="#s1">第 1 章 · 流水线骨架与五级划分</a></li>
+    <li><a href="#s2">第 1 章核心 · 握手规范 valid / allowin / ready_go</a></li>
+    <li><a href="#s3">每级内部：计算模块 与 寄存模块 必须分开</a></li>
+    <li><a href="#s4">级间总线：位宽、打包与排线图</a></li>
+    <li><a href="#s5">存储器：inst_sram_en / data_sram_en 片选 + BRAM 实现</a></li>
+    <li><a href="#s6">第 2 章 · 数据前递（EXE&gt;MEM&gt;WB）与 Load-Use 阻塞</a></li>
+    <li><a href="#s7">特殊情况全覆盖清单 + 汇报要点</a></li>
+  </ol>
+</div>
+
+<!-- ======================= §0 ======================= -->
+<h2 id="s0">0 · 学前预备：把流水线想成一条工厂流水线</h2>
+
+<p>先给你三个锚点，后面所有内容都挂在这三个锚点上。</p>
+
+<div class="box note">
+<b>锚点一：流水线不是"让一条指令跑得更快"，而是"让很多条指令同时跑"。</b><br>
+一条指令从头到尾要花的时间（<b>延迟 latency</b>）其实<b>变长了一点点</b>（多了级间寄存器的建立时间），
+但<b>吞吐率 throughput</b> 提高了——理想情况下每个时钟周期都能<b>完成</b>一条指令。
+汇报时如果老师问"流水线快在哪"，答吞吐率，别答延迟。
+</div>
+
+<div class="box note">
+<b>锚点二：每一级之间必须有一排寄存器（流水线缓存），否则各级会互相污染。</b><br>
+组合逻辑是"立刻生效"的。如果 IF 算出的 PC 直接连到取指、ID 又马上译码，那么新 PC 会一路冲到底，
+把前一条指令的中间结果全部冲掉。加一排寄存器后，<b>每一级在某一拍看到的，永远是"上一拍上级送来的那一条指令"</b>。
+</div>
+
+<div class="box note">
+<b>锚点三：五级流水线里，一切的复杂性都来自两个字——"相关"。</b><br>
+后一条指令要用前一条指令的结果。第 1 章故意<b>不处理</b>这个问题（所以第 1 章的 CPU 是"错"的，
+只是错的指令恰好没被测到）；第 2 章就是来解决它的：能前递就前递，不能前递就阻塞。
+</div>
+
+<h3>0.1 五级分别是干什么的</h3>
+
+<table>
+<thead><tr><th style="width:110px">级</th><th style="width:80px">英文名</th><th>这一级负责什么</th><th style="width:220px">本工程对应文件</th></tr></thead>
+<tbody>
+<tr><td><b>取指</b></td><td class="mono">IF</td>
+    <td>算好下一条指令的地址，送到指令 RAM，把取回来的指令字存进级间寄存器</td><td class="mono">IF_stage.v</td></tr>
+<tr><td><b>译码</b></td><td class="mono">ID</td>
+    <td>拆指令字段 → 认出这是哪条指令 → 读寄存器堆 → 生成一整套控制信号 → 分支判断</td><td class="mono">ID_stage.v</td></tr>
+<tr><td><b>执行</b></td><td class="mono">EXE</td>
+    <td>ALU 运算 / 乘除；算访存地址；给出数据 RAM 的控制信号</td><td class="mono">EXE_stage.v + alu.v</td></tr>
+<tr><td><b>访存</b></td><td class="mono">MEM</td>
+    <td>读数据 RAM；按字节/半字做选取与符号扩展；决定最终写回值</td><td class="mono">MEM_stage.v</td></tr>
+<tr><td><b>写回</b></td><td class="mono">WB</td>
+    <td>把结果写回寄存器堆；输出 trace 调试信号</td><td class="mono">WB_stage.v + RegFiles.v</td></tr>
+</tbody>
+</table>
+
+<p class="small">记忆口诀：<b>取（Fetch）→ 译（Decode）→ 算（Execute）→ 存（Memory）→ 写（Writeback）</b>。
+注意 LA32R 是 LoongArch，<b>没有延迟槽</b>（MIPS 有），所以分支后面那条指令本来就不该执行——后面会看到我们怎么"取消"它。</p>
+
+<!-- ======================= §1 ======================= -->
+<h2 id="s1">1 · 第 1 章 · 流水线骨架</h2>
+
+<h3>1.1 骨架长什么样</h3>
+
+<div class="fig">
+<svg viewBox="0 0 900 300" role="img" aria-label="五级流水线骨架：IF、ID、EXE、MEM、WB 五级，级间各有一排流水线寄存器">
+  <title>五级流水线骨架</title>
+  <desc>五个流水级横向排列，级间各有一排流水线寄存器，IF 前方有 pre-IF 组合逻辑，分支总线从 ID 反馈回 IF。</desc>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <text x="30" y="34" font-size="13" font-weight="600" fill="#2C2C2A">pre-IF（组合）</text>
+  <rect x="30" y="46" width="96" height="52" rx="8" fill="#F1EFE8" stroke="#888780" stroke-width="0.5"/>
+  <text x="78" y="66" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#2C2C2A">next_pc</text>
+  <text x="78" y="82" font-size="11" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">seq / br</text>
+
+  <rect x="176" y="46" width="118" height="52" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="235" y="64" font-size="13.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#0C447C">IF</text>
+  <text x="235" y="82" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#185FA5">取指</text>
+
+  <rect x="344" y="46" width="118" height="52" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="403" y="64" font-size="13.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#085041">ID</text>
+  <text x="403" y="82" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#0F6E56">译码</text>
+
+  <rect x="512" y="46" width="118" height="52" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="571" y="64" font-size="13.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#633806">EXE</text>
+  <text x="571" y="82" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#854F0B">执行</text>
+
+  <rect x="680" y="46" width="118" height="52" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="739" y="64" font-size="13.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#3C3489">MEM</text>
+  <text x="739" y="82" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#534AB7">访存</text>
+
+  <rect x="796" y="46" width="74" height="52" rx="8" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.5"/>
+  <text x="833" y="64" font-size="13.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#791F1F">WB</text>
+  <text x="833" y="82" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#A32D2D">写回</text>
+
+  <rect x="146" y="120" width="44" height="30" rx="5" fill="#FFFFFF" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="168" y="135" font-size="9.5" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">64</text>
+  <rect x="314" y="120" width="44" height="30" rx="5" fill="#FFFFFF" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="336" y="135" font-size="9.5" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">160</text>
+  <rect x="482" y="120" width="44" height="30" rx="5" fill="#FFFFFF" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="504" y="135" font-size="9.5" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">75</text>
+  <rect x="650" y="120" width="44" height="30" rx="5" fill="#FFFFFF" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="672" y="135" font-size="9.5" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">70</text>
+  <text x="600" y="160" font-size="11.5" text-anchor="middle" fill="#888780">▍= 流水线缓存（级间寄存器），框内数字 = 该总线位宽</text>
+
+  <path d="M126 72 L 172 72" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#ar)"/>
+  <path d="M190 98 L 190 120" fill="none" stroke="#5F5E5A" stroke-width="1.5"/>
+  <path d="M190 150 L 190 130" fill="none" stroke="#5F5E5A" stroke-width="1.5"/>
+  <path d="M294 72 L 340 72" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#ar)"/>
+  <path d="M462 72 L 508 72" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#ar)"/>
+  <path d="M630 72 L 676 72" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#ar)"/>
+  <path d="M798 72 L 792 72" fill="none" stroke="#888780" stroke-width="1.5" marker-end="url(#ar)"/>
+
+  <path d="M403 46 L 403 26 L 571 26 L 571 42" fill="none" stroke="#A32D2D" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+  <text x="487" y="18" font-size="11.5" text-anchor="middle" fill="#A32D2D">br_bus 33（分支反馈）</text>
+
+  <rect x="176" y="186" width="118" height="34" rx="8" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.5"/>
+  <text x="235" y="203" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">inst_ram</text>
+  <path d="M235 186 L 235 102" fill="none" stroke="#B4B2A9" stroke-width="1.2" stroke-dasharray="3 3"/>
+
+  <rect x="680" y="186" width="118" height="34" rx="8" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.5"/>
+  <text x="739" y="203" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">data_ram</text>
+  <path d="M739 186 L 739 102" fill="none" stroke="#B4B2A9" stroke-width="1.2" stroke-dasharray="3 3"/>
+
+  <rect x="796" y="186" width="74" height="34" rx="8" fill="#FFFFFF" stroke="#B4B2A9" stroke-width="0.5"/>
+  <text x="833" y="203" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">RegFiles</text>
+  <path d="M833 186 L 833 102" fill="none" stroke="#B4B2A9" stroke-width="1.2" stroke-dasharray="3 3"/>
+</svg>
+<div class="cap">图 1 · 本工程的五级流水线骨架（含级间寄存器位宽与反馈通路）</div>
+</div>
+
+<h3>1.2 级间为什么必须放寄存器：一个反例</h3>
+
+<p>假设没有级间寄存器，第 N 拍 IF 把 PC 从 <code>0x1000</code> 改成 <code>0x1004</code>。
+这个新值<b>立刻</b>传到指令 RAM，RAM 的输出<b>立刻</b>变成 <code>0x1004</code> 处的指令，
+ID 又<b>立刻</b>译这条新指令……结果是：<code>0x1000</code> 那条指令在第 N 拍<b>凭空消失</b>了，
+它本该在 ID 级做的事全被冲掉。</p>
+
+<p>加了寄存器以后，第 N 拍结束的时钟沿上，<code>0x1000</code> 的"指令+PC"被锁进 IF/ID 之间的寄存器；
+第 N+1 拍 ID 级看到的<b>永远是这一份快照</b>，即使这时 IF 已经在取 <code>0x1004</code> 了。这就是"流水线缓存"。</p>
+
+<div class="box ok">
+<b>关键理解：</b>级间寄存器里装的<b>不只是数据</b>，还必须装一个 <code>valid</code> 位——
+"这个位置里现在到底有没有一条有效指令"。没有它，复位后流水线上全是垃圾数据，CPU 会拿着随机值乱跑。
+</div>
+
+<!-- ======================= §2 ======================= -->
+<h2 id="s2">2 · 握手规范：valid / allowin / ready_go</h2>
+
+<h3>2.1 三个信号各自由谁产生、送给谁</h3>
+
+<table>
+<thead><tr><th style="width:130px">信号</th><th style="width:80px">方向</th><th>含义（一句人话）</th></tr></thead>
+<tbody>
+<tr><td class="mono">valid</td><td>前 → 后</td><td>"我这一级现在<b>确实有一条有效指令</b>，可以往下送"</td></tr>
+<tr><td class="mono">ready_go</td><td>本级内部</td><td>"我这一级<b>自己干完活了吗</b>"（算完了 / 等的数据到了）</td></tr>
+<tr><td class="mono">allowin</td><td>后 → 前</td><td>"我下一拍<b>腾得出来</b>，你可以把指令送过来"</td></tr>
+</tbody>
+</table>
+
+<p>把这三个信号想成两个管理员在对话：</p>
+<ul>
+<li>前级举手说：<b>我有货（valid）且我这边处理完了（ready_go）</b>；</li>
+<li>后级点头说：<b>我这边有空位（allowin）</b>；</li>
+<li>两个条件<b>同时成立</b>，这一拍货物才真正往下搬一格。</li>
+</ul>
+
+<h3>2.2 三条公式（背下来，老师最爱问）</h3>
+
+<pre><code><span class="cmt">// ① 本级"能接收新指令"的条件：要么我本来就是空的，要么我能出货且后级收得下</span>
+<span class="sig">allowin</span>      = !valid || (ready_go &amp;&amp; next_allowin);
+
+<span class="cmt">// ② 本级"对后级有效"的条件：我确有指令，且我自己已经干完活</span>
+<span class="sig">to_next_valid</span> = valid &amp;&amp; ready_go;
+
+<span class="cmt">// ③ 数据真正写入级间寄存器的条件：前级给了我有效数据，且我收得下</span>
+<span class="kw">if</span> (to_prev_valid &amp;&amp; allowin)  bus_r &lt;= bus;</code></pre>
+
+<div class="box warn">
+<b>为什么 <code>allowin</code> 里要有 <code>!valid</code> 这一项？</b><br>
+因为本级是空的时，<b>不需要等自己"干完活"</b>就可以接收——空级没有活要干。
+少了这一项会出现死锁：本级空 → <code>ready_go</code> 可能为 0 → <code>allowin</code> 为 0 → 永远接收不了新指令。
+</div>
+
+<h3>2.3 本工程里的真实实现（逐行对照）</h3>
+
+<h4>IF 级 <span class="tag ch1">第 1 章</span></h4>
+<pre><code><span class="kw">assign</span> to_fs_valid      = ~reset;          <span class="cmt">// 复位结束就永远有指令要取（源头）</span>
+<span class="kw">assign</span> fs_ready_go      = 1'b1;            <span class="cmt">// IF 级不需要等任何东西（第 1 章）</span>
+<span class="kw">assign</span> fs_allowin       = !fs_valid || fs_ready_go &amp;&amp; ds_allowin;
+<span class="kw">assign</span> fs_to_ds_valid   = fs_valid &amp;&amp; fs_ready_go &amp;&amp; ~br_taken;  <span class="cmt">// ← 多一项，见 §2.5</span>
+
+<span class="kw">always</span> @(<span class="kw">posedge</span> clk)
+    <span class="kw">if</span> (reset)              fs_valid &lt;= 1'b0;
+    <span class="kw">else if</span> (fs_allowin)   fs_valid &lt;= to_fs_valid;   <span class="cmt">// 接收来自 pre-IF 的 valid</span></code></pre>
+
+<h4>ID 级 <span class="tag ch1">第 1 章</span> <span class="tag ch2">第 2 章改造</span></h4>
+<pre><code><span class="cmt">// 第 1 章：ready_go 恒 1；第 2 章：出现 RAW 且无法前递时必须拉低</span>
+<span class="kw">assign</span> ds_ready_go    = ~load_stall &amp; ~div_stall &amp; ~mul_stall &amp; ~branch_load_stall;
+<span class="kw">assign</span> ds_allowin     = !ds_valid || ds_ready_go &amp;&amp; es_allowin;
+<span class="kw">assign</span> ds_to_es_valid = ds_valid &amp;&amp; ds_ready_go;</code></pre>
+
+<h4>EXE 级 <span class="tag ch1">第 1 章</span> <span class="tag ch5">第 5 章改造</span></h4>
+<pre><code><span class="kw">assign</span> es_ready_go    = !es_div_inst || es_div_ready;  <span class="cmt">// 除法要多拍（第 5 章）</span>
+<span class="kw">assign</span> es_allowin     = !es_valid || (es_ready_go &amp;&amp; ms_allowin);
+<span class="kw">assign</span> es_to_ms_valid = es_valid &amp;&amp; es_ready_go;</code></pre>
+
+<h4>MEM / WB 级 <span class="tag ch1">第 1 章</span></h4>
+<pre><code><span class="cmt">// MEM：本章的 RAM 一拍就返回，永远 ready</span>
+<span class="kw">assign</span> ms_ready_go    = 1'b1;
+<span class="kw">assign</span> ms_allowin     = !ms_valid || (ms_ready_go &amp;&amp; ws_allowin);
+
+<span class="cmt">// WB：最后一级，没有下游，因此 allowin 里没有 next_allowin 这一项</span>
+<span class="kw">assign</span> ws_ready_go    = 1'b1;
+<span class="kw">assign</span> ws_allowin     = !ws_valid || ws_ready_go;</code></pre>
+
+<div class="box note">
+<b>对比一下 WB 和前面几级</b>：WB 的 <code>allowin = !ws_valid || ws_ready_go</code>，
+<b>没有</b> <code>&amp;&amp; next_allowin</code>——因为它后面没有级了，外面永远收得下（写寄存器堆是瞬间完成的）。
+这也解释了为什么"流水线最末级不会成为阻塞源"。
+</div>
+
+<h3>2.4 阻塞是怎么一级一级往前传的</h3>
+
+<p>假设 EXE 级正在做除法，<code>es_ready_go = 0</code>：</p>
+<ol>
+<li><code>es_allowin = !es_valid || (0 &amp;&amp; ...) = 0</code>（只要 EXE 里有指令）→ EXE 收不下；</li>
+<li><code>ds_allowin = !ds_valid || (ds_ready_go &amp;&amp; es_allowin=0) = 0</code> → ID 也收不下；</li>
+<li><code>fs_allowin = !fs_valid || (fs_ready_go &amp;&amp; ds_allowin=0) = 0</code> → IF 也停住；</li>
+<li>最终 <code>inst_sram_en = to_fs_valid &amp;&amp; fs_allowin = 0</code> → 连取指都停了。</li>
+</ol>
+
+<div class="box dang">
+<b>这就是"后面堵了，前面必须立刻一起堵"。</b>
+否则前面还在往里塞新指令，后面又出不去，指令就<b>丢了</b>。
+整个链条靠的就是 <code>allowin</code> 一级一级往前传——这也是为什么指导书说"每级都要有个管理人员"。
+</div>
+
+<h3>2.5 控制相关：分支时怎么"取消"已取进来的指令</h3>
+
+<p>分支在 <b>ID 级</b> 才判断出来（要看寄存器的值）。但这时 IF 级里那条<b>顺序取进来的下一条指令</b>已经在了。
+LA32R 无延迟槽，所以它<b>不该被执行</b>。办法极简——把它的 <code>valid</code> 抹掉：</p>
+
+<pre><code><span class="kw">assign</span> fs_to_ds_valid = fs_valid &amp;&amp; fs_ready_go &amp;&amp; <span class="kw">~br_taken</span>;
+
+<span class="cmt">// br_bus = {br_taken(1), br_target(32)}，从 ID 直接反馈回 IF</span>
+<span class="kw">assign</span> {br_taken, br_target} = br_bus;
+<span class="kw">assign</span> next_pc = (br_taken == 1) ? br_target : seq_pc;</code></pre>
+
+<div class="box warn">
+<b>注意这是一种"组合式 flush"</b>：<code>br_taken=1</code> 的这一拍，IF 级的指令<b>当场</b>对 ID 不可见，
+ID 这一拍收不到东西（<code>fs_to_ds_valid=0</code>），下一拍 IF 已经按 <code>br_target</code> 取到新指令了。
+代价是<b>分支损失 1 个周期</b>（取指级那一条作废）。<br>
+代价换来了什么：分支判断放在 ID 级，源操作数可以走前递，<b>不需要</b>像有些教材那样把分支挪到 EXE 级再算。
+</div>
+
+<!-- ======================= §3 ======================= -->
+<h2 id="s3">3 · 每级内部：计算模块 与 寄存模块 必须分开</h2>
+
+<h3>3.1 通用模型（最重要的一张图）</h3>
+
+<div class="fig">
+<svg viewBox="0 0 900 250" role="img" aria-label="单个流水级的内部：前级寄存器、组合计算模块、本级寄存器三段">
+  <title>单级内部：计算与寄存分离</title>
+  <desc>每一级由三段组成：前级送来的数据先进入本级寄存器，再经过纯组合的计算模块，输出到下一级寄存器；valid 与 allowin 分别是前后方向的握手信号。</desc>
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect x="30" y="90" width="150" height="70" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="105" y="112" font-size="12.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#2C2C2A">前级寄存器</text>
+  <text x="105" y="132" font-size="11" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">bus_r + valid</text>
+
+  <rect x="250" y="80" width="200" height="90" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="350" y="106" font-size="13" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#0C447C">组合计算模块</text>
+  <text x="350" y="126" font-size="11" text-anchor="middle" dominant-baseline="central" fill="#185FA5">纯组合逻辑，无触发器</text>
+  <text x="350" y="146" font-size="11" text-anchor="middle" dominant-baseline="central" fill="#185FA5">输出 ready_go</text>
+
+  <rect x="520" y="90" width="150" height="70" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="595" y="112" font-size="12.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#2C2C2A">后级寄存器</text>
+  <text x="595" y="132" font-size="11" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">bus_r + valid</text>
+
+  <rect x="700" y="90" width="170" height="70" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="785" y="112" font-size="12.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#633806">再下一级</text>
+  <text x="785" y="132" font-size="11" text-anchor="middle" dominant-baseline="central" fill="#854F0B">产生 allowin</text>
+
+  <path d="M180 125 L 246 125" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#ar2)"/>
+  <path d="M450 125 L 516 125" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#ar2)"/>
+  <path d="M670 125 L 696 125" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#ar2)"/>
+
+  <path d="M670 100 C 700 60 400 60 380 80" fill="none" stroke="#A32D2D" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ar2)"/>
+  <text x="520" y="52" font-size="11.5" text-anchor="middle" fill="#A32D2D">next_allowin（后 → 前，反压）</text>
+
+  <text x="105" y="180" font-size="11.5" text-anchor="middle" fill="#888780">时钟沿更新</text>
+  <text x="595" y="180" font-size="11.5" text-anchor="middle" fill="#888780">时钟沿更新</text>
+  <text x="350" y="196" font-size="11.5" text-anchor="middle" fill="#888780">组合逻辑：本拍输入 → 本拍输出，不占用时钟</text>
+</svg>
+<div class="cap">图 2 · 任一流水级的三段结构：寄存 → 组合计算 → 寄存</div>
+</div>
+
+<div class="box note">
+<b>为什么要这样拆？</b>
+<ul style="margin:6px 0 0 18px">
+<li><b>时序分析只看"寄存器 → 寄存器"</b>这一段组合路径。拆清楚了，哪一级是瓶颈一目了然。</li>
+<li><b>阻塞只影响寄存器</b>（<code>allowin</code> 门控写入），组合逻辑永远在算，不会"卡住"。</li>
+<li>你要做时序优化时，就是在<b>这两排寄存器之间</b>做文章（比如本工程的乘法器就被挪出了前递逻辑锥）。</li>
+</ul>
+</div>
+
+<h3>3.2 五级各自的"计算部分 / 寄存部分"清单</h3>
+
+<table>
+<thead><tr><th style="width:70px">级</th><th>寄存部分（触发器，时钟沿更新）</th><th>计算部分（纯组合）</th><th style="width:150px">ready_go 来源</th></tr></thead>
+<tbody>
+<tr><td><b>IF</b></td>
+  <td class="mono">fs_valid<br>fs_pc</td>
+  <td class="mono">seq_pc = fs_pc+4<br>next_pc = br_taken? br_target : seq_pc<br>fs_to_ds_bus = {inst_sram_rdata, fs_pc}</td>
+  <td>恒 1</td></tr>
+<tr><td><b>ID</b></td>
+  <td class="mono">ds_valid<br>fs_to_ds_bus_r</td>
+  <td class="mono">译码器 decoder_6_64/4_16/2_4/5_32<br>立即数扩展<br>前递 MUX<br>分支比较 + 目标地址<br>ds_to_es_bus 打包</td>
+  <td class="mono">~load_stall &amp; ~div_stall<br>&amp; ~mul_stall &amp; ~branch_load_stall</td></tr>
+<tr><td><b>EXE</b></td>
+  <td class="mono">es_valid<br>ds_to_es_bus_r<br>div_sent / div_done / div_result_r</td>
+  <td class="mono">ALU（+乘法器）<br>除法器 divider<br>访存地址 = alu_result<br>写使能译码 we_byte/we_half/we_word<br>es_to_ms_bus 打包</td>
+  <td class="mono">!es_div_inst || es_div_ready</td></tr>
+<tr><td><b>MEM</b></td>
+  <td class="mono">ms_valid<br>es_to_ms_bus_r</td>
+  <td class="mono">字节/半字选取<br>符号/零扩展<br>ms_final_result 选择<br>ms_to_ws_bus 打包</td>
+  <td>恒 1</td></tr>
+<tr><td><b>WB</b></td>
+  <td class="mono">ws_valid<br>ms_to_ws_bus_r</td>
+  <td class="mono">rf_we 生成<br>ws_to_rf_bus 打包<br>trace 输出</td>
+  <td>恒 1</td></tr>
+</tbody>
+</table>
+
+<div class="box warn">
+<b>一个容易看错的地方</b>：寄存器堆 <code>RegFiles</code> 挂在 <b>ID 级</b>（读端口在 ID），
+但<b>写端口来自 WB 级</b>（<code>ws_to_rf_bus</code>）。
+所以"读"在流水线的第 2 级，"写"在第 5 级——<b>这个 3 级的距离就是第 2 章所有冲突的根源</b>。
+</div>
+
+<!-- ======================= §4 ======================= -->
+<h2 id="s4">4 · 级间总线：位宽、打包与排线图</h2>
+
+<h3>4.1 为什么要把几十个信号"打包"成一条 bus</h3>
+
+<p>每一级要传给下一级的信号少则几个、多则二十几个。如果逐个端口连线，顶层会变成一团乱麻，
+而且<b>漏连一个信号不会报错，只会静默出错</b>。所以约定：</p>
+<ul>
+<li>打包成<b>一条</b> <code>xxx_bus</code>，和<b>一个</b> <code>xxx_valid</code> 一起往下传；</li>
+<li><b>打包侧和解包侧必须用同一个顺序</b>（用 <code>{}</code> 拼接 / 拆分），顺序错了位就错位；</li>
+<li>指导书的经典好处：<b>清空流水线时只要把 valid 清 0，不用把 data 清 0</b>。</li>
+</ul>
+
+<h3>4.2 五条总线总表</h3>
+
+<table>
+<thead><tr><th style="width:150px">总线</th><th style="width:60px">位宽</th><th style="width:110px">方向</th><th>装的是什么</th></tr></thead>
+<tbody>
+<tr><td class="mono">fs_to_ds_bus</td><td><b>64</b></td><td>IF → ID</td><td>指令字 + 该指令的 PC</td></tr>
+<tr><td class="mono">ds_to_es_bus</td><td><b>160</b></td><td>ID → EXE</td><td>ALU 操作码 + 两个源操作数 + 一整套控制位</td></tr>
+<tr><td class="mono">es_to_ms_bus</td><td><b>75</b></td><td>EXE → MEM</td><td>运算结果（或访存地址）+ 访存属性 + 写回属性</td></tr>
+<tr><td class="mono">ms_to_ws_bus</td><td><b>70</b></td><td>MEM → WB</td><td>最终写回值 + 写回目标</td></tr>
+<tr><td class="mono">ws_to_rf_bus</td><td><b>38</b></td><td>WB → ID（反向）</td><td>写寄存器堆的三个信号</td></tr>
+<tr><td class="mono">br_bus</td><td><b>33</b></td><td>ID → IF（反向）</td><td>是否跳转 + 跳转目标</td></tr>
+</tbody>
+</table>
+
+<h3>4.3 fs_to_ds_bus（64 位）</h3>
+<div class="bits">
+  <div class="bf c1"><span class="n">inst</span><span class="r">63:32</span></div>
+  <div class="bf c2"><span class="n">pc</span><span class="r">31:0</span></div>
+</div>
+<pre><code><span class="cmt">// IF_stage.v（打包）</span>
+<span class="kw">assign</span> fs_to_ds_bus = {fs_inst, fs_pc};
+
+<span class="cmt">// ID_stage.v（解包）—— 顺序必须完全一致</span>
+<span class="kw">assign</span> {ds_inst, ds_pc} = fs_to_ds_bus_r;</code></pre>
+
+<h3>4.4 ds_to_es_bus（160 位）—— 最宽的一条</h3>
+<div class="bits">
+  <div class="bf c0"><span class="n">spare</span><span class="r">159</span></div>
+  <div class="bf c3"><span class="n">alu_op</span><span class="r">158:143</span></div>
+  <div class="bf c5"><span class="n">div_en</span><span class="r">142</span></div>
+  <div class="bf c5"><span class="n">div_sgn</span><span class="r">141</span></div>
+  <div class="bf c5"><span class="n">div_rem</span><span class="r">140</span></div>
+  <div class="bf c4"><span class="n">res_mem</span><span class="r">139</span></div>
+  <div class="bf c1"><span class="n">src1</span><span class="r">138:107</span></div>
+  <div class="bf c1"><span class="n">src2</span><span class="r">106:75</span></div>
+  <div class="bf c2"><span class="n">gr_we</span><span class="r">74</span></div>
+  <div class="bf c2"><span class="n">mem_we</span><span class="r">73</span></div>
+  <div class="bf c3"><span class="n">size</span><span class="r">72:70</span></div>
+  <div class="bf c3"><span class="n">ld_sgn</span><span class="r">69</span></div>
+  <div class="bf c6"><span class="n">dest</span><span class="r">68:64</span></div>
+  <div class="bf c1"><span class="n">store_data</span><span class="r">63:32</span></div>
+  <div class="bf c2"><span class="n">pc</span><span class="r">31:0</span></div>
+</div>
+
+<pre><code><span class="cmt">// ID_stage.v —— 打包</span>
+<span class="kw">assign</span> ds_to_es_bus = {
+    1'b0,                             <span class="cmt">// 1   保留（第 6 章异常预留）</span>
+    alu_op,                           <span class="cmt">// 16  ALU 操作码（独热）</span>
+    ds_div_en, ds_div_signed, ds_div_rem,  <span class="cmt">// 3   除法控制（第 5 章）</span>
+    res_from_mem,                     <span class="cmt">// 1   load 类标记</span>
+    src1_is_pc ? ds_pc : rj_value,    <span class="cmt">// 32  ALU 源 1</span>
+    src2_is_imm ? ds_imm : rkd_value, <span class="cmt">// 32  ALU 源 2</span>
+    gr_we, mem_we,                    <span class="cmt">// 2   写寄存器 / 写内存</span>
+    ds_mem_size, ds_ld_signed,        <span class="cmt">// 4   访存宽度 + 是否符号扩展</span>
+    dest,                             <span class="cmt">// 5   目标寄存器号</span>
+    rkd_value,                        <span class="cmt">// 32  store 要写的数据</span>
+    ds_pc                             <span class="cmt">// 32  PC（trace 用）</span>
+};</code></pre>
+
+<div class="box ask">
+<b>为什么 <code>rkd_value</code> 要传两次？</b><br>
+一次作为"ALU 源 2"（给 3R 型运算用），一次原样传给 EXE 作为"store 的写数据"。
+因为 store 的地址是 <code>rj + imm</code>（走 ALU），而要<b>写出去的数据</b>是另一个寄存器 <code>rd</code>——
+两者都要，但不会同时作为 ALU 的输入。所以干脆打包两份。
+</div>
+
+<h3>4.5 es_to_ms_bus（75 位）</h3>
+<div class="bits">
+  <div class="bf c4"><span class="n">res_mem</span><span class="r">74</span></div>
+  <div class="bf c2"><span class="n">gr_we</span><span class="r">73</span></div>
+  <div class="bf c3"><span class="n">size</span><span class="r">72:70</span></div>
+  <div class="bf c3"><span class="n">ld_sgn</span><span class="r">69</span></div>
+  <div class="bf c6"><span class="n">dest</span><span class="r">68:64</span></div>
+  <div class="bf c1"><span class="n">result</span><span class="r">63:32</span></div>
+  <div class="bf c2"><span class="n">pc</span><span class="r">31:0</span></div>
+</div>
+<pre><code><span class="kw">assign</span> es_to_ms_bus = { es_res_from_mem, es_gr_we, es_mem_size, es_ld_signed,
+                        es_dest, es_final_result, es_pc };
+<span class="cmt">// 注意：对 load 指令，es_final_result 里装的是"访存地址"，不是数据！</span>
+<span class="cmt">// 真正的读数据要等 MEM 级从 data_ram 取回来 —— 这正是 Load-Use 阻塞的由来（§6.6）</span></code></pre>
+
+<h3>4.6 ms_to_ws_bus（70 位）与 ws_to_rf_bus（38 位）</h3>
+<div class="bits">
+  <div class="bf c2"><span class="n">gr_we</span><span class="r">69</span></div>
+  <div class="bf c6"><span class="n">dest</span><span class="r">68:64</span></div>
+  <div class="bf c1"><span class="n">final_result</span><span class="r">63:32</span></div>
+  <div class="bf c0"><span class="n">pc</span><span class="r">31:0</span></div>
+</div>
+<div class="bits">
+  <div class="bf c2"><span class="n">rf_we</span><span class="r">37</span></div>
+  <div class="bf c6"><span class="n">waddr</span><span class="r">36:32</span></div>
+  <div class="bf c1"><span class="n">wdata</span><span class="r">31:0</span></div>
+</div>
+
+<h3>4.7 br_bus（33 位，反向）</h3>
+<div class="bits">
+  <div class="bf c5"><span class="n">br_taken</span><span class="r">32</span></div>
+  <div class="bf c5"><span class="n">br_target</span><span class="r">31:0</span></div>
+</div>
+
+<div class="box dang">
+<b>打包 / 解包顺序必须逐位对齐——这是本项目最阴险的一类 bug。</b><br>
+一旦 ID 侧改了顺序而 EXE 侧没改，<b>综合不会报错、仿真前期也不一定报错</b>，
+只会在某条指令上算出莫名其妙的值。改总线时的铁律：
+<b>改一端必须立刻改另一端，并且数一遍总位数是否仍等于宏定义的位宽。</b>
+</div>
+
+<!-- ======================= §5 ======================= -->
+<h2 id="s5">5 · 存储器：片选信号与 BRAM 实现</h2>
+
+<h3>5.1 CPU 看到的 RAM 接口（6 个信号）</h3>
+
+<table>
+<thead><tr><th style="width:150px">信号</th><th style="width:80px">方向</th><th>含义</th></tr></thead>
+<tbody>
+<tr><td class="mono">xxx_sram_en</td><td>出</td><td><b>片选 / 访问使能</b>：1 = 这一次访问有效。RAM 只在它为 1 时才动作</td></tr>
+<tr><td class="mono">xxx_sram_we</td><td>出</td><td><b>字节写使能</b> 4 位，每位对应一个字节。全 0 = 读</td></tr>
+<tr><td class="mono">xxx_sram_addr</td><td>出</td><td>字节地址（32 位）</td></tr>
+<tr><td class="mono">xxx_sram_wdata</td><td>出</td><td>写数据</td></tr>
+<tr><td class="mono">xxx_sram_rdata</td><td>入</td><td>读数据（同步 RAM：下一拍才有效）</td></tr>
+</tbody>
+</table>
+
+<h3>5.2 inst_sram_en：取指片选怎么来</h3>
+
+<pre><code><span class="cmt">// IF_stage.v</span>
+<span class="kw">assign</span> inst_sram_en    = to_fs_valid &amp;&amp; fs_allowin;  <span class="cmt">// ★ 片选</span>
+<span class="kw">assign</span> inst_sram_we    = 4'h0;                       <span class="cmt">// 指令 RAM 永远只读</span>
+<span class="kw">assign</span> inst_sram_addr  = next_pc;
+<span class="kw">assign</span> inst_sram_wdata = 32'b0;
+<span class="kw">assign</span> fs_inst         = inst_sram_rdata;</code></pre>
+
+<div class="box note">
+<b>为什么片选要 &amp;&amp; fs_allowin？</b><br>
+<code>fs_allowin=0</code> 意味着 IF 级<b>这一拍被堵住了</b>，它手上的指令不能往下走。
+如果这时还去读 RAM，那么这次读出来的指令<b>在下一拍无处可去</b>（IF 寄存器不允许更新），
+就等于<b>白读一次、且把正确的下一次访问冲掉</b>。所以片选必须和"我这一拍真的接收新 PC"严格同相。
+</div>
+
+<h3>5.3 data_sram_en：访存片选怎么来</h3>
+
+<pre><code><span class="cmt">// EXE_stage.v</span>
+<span class="kw">assign</span> data_sram_en    = es_valid &amp;&amp; (es_res_from_mem || es_mem_we);  <span class="cmt">// ★ 片选</span>
+<span class="kw">assign</span> data_sram_we    = (es_valid &amp;&amp; es_mem_we) ? es_store_we : 4'b0000;
+<span class="kw">assign</span> data_sram_addr  = alu_result;      <span class="cmt">// 地址 = ALU 算出的 rj + imm</span>
+<span class="kw">assign</span> data_sram_wdata = es_store_wdata;</code></pre>
+
+<p>只有 <b>load</b>（<code>es_res_from_mem</code>）或 <b>store</b>（<code>es_mem_we</code>）才拉高片选。
+普通算术指令不访问数据 RAM——这既是<b>省电</b>，也是<b>避免误改内存</b>。</p>
+
+<h4>字节写使能的译码（第 4 章内容，先认识一下）</h4>
+<pre><code><span class="kw">wire</span> [1:0] es_addr_low = alu_result[1:0];        <span class="cmt">// 字内字节偏移（小端）</span>
+<span class="kw">wire</span> [3:0] we_byte = 4'b0001 &lt;&lt; es_addr_low;     <span class="cmt">// st.b：00→0001 01→0010 10→0100 11→1000</span>
+<span class="kw">wire</span> [3:0] we_half = es_addr_low[1] ? 4'b1100 : 4'b0011;  <span class="cmt">// st.h</span>
+<span class="kw">wire</span> [3:0] we_word = 4'b1111;                    <span class="cmt">// st.w</span>
+
+<span class="cmt">// 写数据"复制"到各字节通道，配合上面的 we 就能落到正确位置</span>
+<span class="kw">wire</span> [31:0] wdata_byte = {4{es_rkd_value[7:0]}};
+<span class="kw">wire</span> [31:0] wdata_half = {2{es_rkd_value[15:0]}};</code></pre>
+<p class="small">例如地址 <code>...01</code> 写字节：<code>we=0010</code>，<code>wdata = {d,d,d,d}</code>，
+只有 byte1 通道被打开 → 内存里只有 byte1 被改成 <code>d</code>，其余三个字节不受影响。</p>
+
+<h3>5.4 "片选齐备"的真正含义：bridge_1x2 的地址译码</h3>
+
+<p>CPU 只有一个数据口，但 SoC 里有<b>两个从设备</b>：数据 RAM 和 confreg（数码管/拨码开关等外设）。
+<b>片选</b>在这里才体现出它的本质——<b>按地址选出该响应的是哪一块</b>：</p>
+
+<pre><code><span class="cmt">// bridge_1x2.v</span>
+<span class="kw">assign</span> sel_conf = (cpu_data_addr &amp; 32'h1fff_0000) == 32'h1faf_0000;  <span class="cmt">// 地址落在 0x1faf_xxxx</span>
+<span class="kw">assign</span> sel_sram = !sel_conf;
+
+<span class="kw">assign</span> data_sram_en = cpu_data_en &amp; sel_sram;   <span class="cmt">// ★ 给数据 RAM 的片选</span>
+<span class="kw">assign</span> conf_en      = cpu_data_en &amp; sel_conf;   <span class="cmt">// ★ 给外设的片选</span></code></pre>
+
+<div class="box warn">
+<b>这里有一拍的时序陷阱</b>：地址译码是<b>组合</b>的（当拍就知道选谁），
+但 RAM 的读数据<b>下一拍</b>才回来。所以要把"这一拍选的是谁"打一拍寄存器，
+回来时才知道该采哪一路：
+<pre style="margin:8px 0 0"><code><span class="kw">always</span> @(<span class="kw">posedge</span> clk) <span class="kw">begin</span> sel_sram_r &lt;= sel_sram; sel_conf_r &lt;= sel_conf; <span class="kw">end</span>
+<span class="kw">assign</span> cpu_data_rdata = {32{sel_sram_r}} &amp; data_sram_rdata
+                      | {32{sel_conf_r}} &amp; conf_rdata;</code></pre>
+</div>
+
+<h3>5.5 BRAM 是怎么实现的（两套，仿真和烧板不一样）</h3>
+
+<div class="fig">
+<svg viewBox="0 0 900 240" role="img" aria-label="BRAM 的两套实现：仿真用行为级 sync_ram，上板用 Xilinx IP">
+  <title>BRAM 双实现</title>
+  <desc>仿真时 testbench 的行为级 sync_ram 覆盖 Xilinx IP，用 readmemb 读 mif；上板时 Xilinx blk_mem_gen IP 综合成 256 个 RAMB36，初始化数据固化在 coe 里。</desc>
+  <rect x="30" y="30" width="400" height="180" rx="14" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+  <text x="230" y="56" font-size="13.5" font-weight="600" text-anchor="middle" fill="#173404">仿真：行为级 sync_ram.v</text>
+  <rect x="56" y="76" width="348" height="46" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.5"/>
+  <text x="230" y="99" font-size="12" text-anchor="middle" dominant-baseline="central" fill="#2C2C2A">reg [31:0] ram [0:DEPTH-1];</text>
+  <text x="230" y="114" font-size="11" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">$readmemb(".../func/obj/inst_ram.mif")</text>
+  <text x="230" y="140" font-size="12" text-anchor="middle" fill="#3B6D11">编译时同名模块覆盖 IP → VRFC 10-3609（正常）</text>
+  <text x="230" y="162" font-size="11.5" text-anchor="middle" fill="#5F5E5A">换程序只要换 .mif</text>
+  <text x="230" y="186" font-size="11.5" text-anchor="middle" fill="#5F5E5A">inst_ram: 18 位地址 = 256K 字</text>
+
+  <rect x="470" y="30" width="400" height="180" rx="14" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="670" y="56" font-size="13.5" font-weight="600" text-anchor="middle" fill="#26215C">上板：Xilinx blk_mem_gen IP</text>
+  <rect x="496" y="76" width="348" height="46" rx="8" fill="#FFFFFF" stroke="#AFA9EC" stroke-width="0.5"/>
+  <text x="670" y="99" font-size="12" text-anchor="middle" dominant-baseline="central" fill="#2C2C2A">256 × RAMB36E1 拼出 256K × 32bit</text>
+  <text x="670" y="114" font-size="11" text-anchor="middle" dominant-baseline="central" fill="#5F5E5A">init 数据在 IP 生成时固化</text>
+  <text x="670" y="140" font-size="12" text-anchor="middle" fill="#534AB7">64 block × 4 byte-lane 布局</text>
+  <text x="670" y="162" font-size="11.5" text-anchor="middle" fill="#5F5E5A">换程序要换 .coe 并 Reset+Generate IP</text>
+  <text x="670" y="186" font-size="11.5" text-anchor="middle" fill="#5F5E5A">还要重跑 inst_ram_synth_1</text>
+</svg>
+<div class="cap">图 3 · 同一个 inst_ram，仿真与上板是两套完全不同的实现</div>
+</div>
+
+<h4>仿真用的行为模型（你能在仿真里读懂的那一版）</h4>
+<pre><code><span class="kw">module</span> sync_ram <span class="cmt">#(ADDR_WIDTH=16, DATA_WIDTH=32, DEPTH=1&lt;&lt;ADDR_WIDTH)</span> (...);
+    <span class="kw">reg</span> [DATA_WIDTH-1:0] ram [0:DEPTH-1];
+
+    <span class="cmt">// 按字节通道写</span>
+    <span class="kw">for</span> (i=0; i&lt;NUM_BYTES; i=i+1)
+        <span class="kw">always</span> @(<span class="kw">posedge</span> clk) <span class="kw">if</span> (we[i]) ram[address][i*8 +: 8] &lt;= wdata[i*8 +: 8];
+
+    <span class="cmt">// 同步读：en=1 时，在时钟沿把数据锁到 rdata（下一拍可见）</span>
+    <span class="kw">always</span> @(<span class="kw">posedge</span> clk) <span class="kw">if</span> (en) rdata &lt;= ram[address];
+<span class="kw">endmodule</span></code></pre>
+
+<h4>顶层怎么接（注意地址被截断了）</h4>
+<pre><code>inst_ram inst_ram (
+    .clka  (cpu_clk),
+    .ena   (cpu_inst_en),        <span class="cmt">// ← inst_sram_en 直接当片选</span>
+    .wea   (cpu_inst_we),        <span class="cmt">// 4'h0，只读</span>
+    .addra (cpu_inst_addr[19:2]),<span class="cmt">// ★ 字节地址 → 字地址：去掉低 2 位</span>
+    .dina  (cpu_inst_wdata),
+    .douta (cpu_inst_rdata)
+);</code></pre>
+
+<div class="box note">
+<b>为什么是 <code>[19:2]</code> 而不是 <code>[21:2]</code>？</b>
+指导书里外接 BaseRAM 是 20 位地址所以用 <code>[21:2]</code>；
+本工程用的是片内 BRAM，inst_ram 深度 256K 字 = 18 位地址，所以取 <code>[19:2]</code>（多留 1 位余量）。
+<b>这个细节说明：地址线宽度是由"实际挂了多大的存储器"决定的，不是固定的。</b>
+</div>
+
+<h3>5.6 时序对齐：en、addr、rdata 差一拍</h3>
+
+<table>
+<thead><tr><th style="width:70px">周期</th><th>发生什么</th></tr></thead>
+<tbody>
+<tr><td><b>N</b></td><td>IF 送出 <code>inst_sram_en=1</code>、<code>addr=next_pc</code>；同一时钟沿上 BRAM 把 <code>ram[addr]</code> 锁进 <code>douta</code>；<code>fs_pc</code> 也更新为 <code>next_pc</code>；<code>fs_valid</code> 置 1</td></tr>
+<tr><td><b>N+1</b></td><td><code>fs_inst = inst_sram_rdata</code> 已经是正确指令；<code>fs_to_ds_bus = {inst, pc}</code> 有效，<code>fs_to_ds_valid=1</code>；本拍结束时打入 ID 的 <code>fs_to_ds_bus_r</code></td></tr>
+<tr><td><b>N+2</b></td><td>ID 级正式开始译码这条指令</td></tr>
+</tbody>
+</table>
+
+<p class="small">这个"差一拍"是所有同步 BRAM 的共同特征。你可以在仿真波形里验证它：
+<code>inst_sram_addr</code> 变化后的<b>下一个</b>时钟沿，<code>inst_sram_rdata</code> 才跟着变。</p>
+
+<!-- ======================= §6 ======================= -->
+<h2 id="s6">6 · 第 2 章 · 数据前递与 Load-Use 阻塞</h2>
+
+<h3>6.1 三种相关，我们只怕一种</h3>
+<table>
+<thead><tr><th style="width:110px">类型</th><th style="width:130px">全称</th><th>例子</th><th style="width:130px">五级流水要不要管</th></tr></thead>
+<tbody>
+<tr><td><b>RAW</b></td><td>Read After Write<br>（写后读，真相关）</td><td class="mono">add.w $r2,$r1,$r1<br>add.w $r3,$r2,$r2</td><td><b>要管</b>（唯一真冲突）</td></tr>
+<tr><td>WAW</td><td>Write After Write</td><td>两条指令都写 $r2</td><td>不管（顺序执行，后写的本来就在后面）</td></tr>
+<tr><td>WAR</td><td>Write After Read</td><td>后条写 $r2，前条读 $r2</td><td>不管（读在前，不会读错）</td></tr>
+</tbody>
+</table>
+
+<h3>6.2 RAW 的四种"距离"</h3>
+
+<p>设指令 A 写 <code>$r5</code>，指令 B 读 <code>$r5</code>。B 在 A 后面第几条？这决定了怎么修：</p>
+
+<table>
+<thead><tr><th style="width:80px">距离</th><th style="width:150px">A / B 所在级</th><th style="width:160px">结果在哪</th><th>怎么办</th></tr></thead>
+<tbody>
+<tr><td>差 1 条</td><td>A 在 EXE / B 在 ID</td><td>EXE 的 ALU 输出（组合）</td><td><b>从 EXE 前递</b>（若 A 是 load 则见下）</td></tr>
+<tr><td>差 2 条</td><td>A 在 MEM / B 在 ID</td><td>MEM 级寄存器里</td><td><b>从 MEM 前递</b></td></tr>
+<tr><td>差 3 条</td><td>A 在 WB / B 在 ID</td><td>WB 级寄存器里（还没写进堆）</td><td><b>从 WB 前递</b>（或寄存器堆内部直通）</td></tr>
+<tr><td>差 4 条及以上</td><td>A 已退出 / B 在 ID</td><td>已经在寄存器堆里</td><td><b>不用管</b>，直接读堆</td></tr>
+</tbody>
+</table>
+
+<h3>6.3 三条前递通路与优先级</h3>
+
+<div class="fig">
+<svg viewBox="0 0 900 280" role="img" aria-label="数据前递：EXE、MEM、WB 三级把结果送回 ID 级的多路选择器，优先级 EXE 大于 MEM 大于 WB">
+  <title>数据前递通路与优先级</title>
+  <desc>ID 级的两个源操作数各经过一个四级多路选择器，依次判断 EXE、MEM、WB 的前递条件，最后回退到寄存器堆读出值。</desc>
+  <defs>
+    <marker id="ar3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect x="30" y="40" width="130" height="46" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+  <text x="95" y="63" font-size="12.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#633806">EXE 级结果</text>
+  <rect x="30" y="106" width="130" height="46" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="95" y="129" font-size="12.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#3C3489">MEM 级结果</text>
+  <rect x="30" y="172" width="130" height="46" rx="8" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.5"/>
+  <text x="95" y="195" font-size="12.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#791F1F">WB 级结果</text>
+  <rect x="30" y="238" width="130" height="34" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+  <text x="95" y="255" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#2C2C2A">寄存器堆</text>
+
+  <rect x="560" y="88" width="150" height="132" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="635" y="112" font-size="13" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#085041">四级 MUX</text>
+  <text x="635" y="136" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#0F6E56">1 EXE</text>
+  <text x="635" y="156" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#0F6E56">2 MEM</text>
+  <text x="635" y="176" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#0F6E56">3 WB</text>
+  <text x="635" y="196" font-size="11.5" text-anchor="middle" dominant-baseline="central" fill="#0F6E56">4 RegFiles</text>
+
+  <rect x="760" y="130" width="110" height="50" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+  <text x="815" y="148" font-size="12.5" font-weight="600" text-anchor="middle" dominant-baseline="central" fill="#0C447C">rj_value</text>
+  <text x="815" y="166" font-size="11" text-anchor="middle" dominant-baseline="central" fill="#185FA5">/ rkd_value</text>
+
+  <path d="M160 63 L 556 63 L 556 120 L 556 120" fill="none" stroke="#854F0B" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <path d="M160 129 L 556 129" fill="none" stroke="#534AB7" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <path d="M160 195 L 556 195" fill="none" stroke="#A32D2D" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <path d="M160 255 L 400 255 L 400 215 L 556 215" fill="none" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#ar3)"/>
+  <path d="M710 154 L 756 154" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#ar3)"/>
+
+  <text x="360" y="50" font-size="11.5" fill="#854F0B">优先级 1（最新）</text>
+  <text x="360" y="116" font-size="11.5" fill="#534AB7">优先级 2</text>
+  <text x="360" y="182" font-size="11.5" fill="#A32D2D">优先级 3</text>
+  <text x="425" y="250" font-size="11.5" fill="#5F5E5A">优先级 4（最旧，兜底）</text>
+</svg>
+<div class="cap">图 4 · 前递多路选择器：EXE &gt; MEM &gt; WB &gt; 寄存器堆</div>
+</div>
+
+<div class="box ask">
+<b>为什么优先级必须是 EXE &gt; MEM &gt; WB？</b><br>
+因为<b>越靠前的级，指令越新</b>。三条指令先后都写 <code>$r5</code> 时，正确的值一定是<b>最晚那条</b>（在 EXE 的那条）算出来的。
+如果优先级反了，就会拿旧值覆盖新值——这是隐蔽且必然出错的。
+</div>
+
+<h3>6.4 真实代码</h3>
+
+<pre><code><span class="cmt">// ID_stage.v —— rj 的前递（rkd 完全同构，只是换 raddr2 / ds_use_rkd）</span>
+<span class="kw">wire</span> [31:0] rj_forward_data =
+    (es_forward_valid &amp;&amp; ds_use_rj  &amp;&amp; (es_forward_dest == rf_raddr1)) ? es_forward_data :
+    (mem_fwd_ok       &amp;&amp; ds_use_rj  &amp;&amp; (ms_forward_dest == rf_raddr1)) ? ms_forward_data :
+    (ws_forward_valid &amp;&amp; ds_use_rj  &amp;&amp; (ws_forward_dest == rf_raddr1)) ? ws_forward_data :
+                                                                         rf_rdata1;
+
+<span class="cmt">// 前递源的有效条件（EXE 侧，见 EXE_stage.v）</span>
+<span class="kw">assign</span> es_forward_valid = es_valid &amp;&amp; es_gr_we &amp;&amp; (es_dest != 5'd0) &amp;&amp; !es_mul_inst
+                        &amp;&amp; (!es_div_inst || es_div_ready);
+<span class="kw">assign</span> es_forward_dest  = es_dest;
+<span class="kw">assign</span> es_forward_data  = es_forward_result;   <span class="cmt">// ALU 或除法结果</span></code></pre>
+
+<p>三个条件缺一不可，逐个解释：</p>
+<div class="kv">
+  <span class="k"><code>es_valid</code></span><span>EXE 级里<b>确实有</b>指令（否则气泡会伪装成前递源）</span>
+  <span class="k"><code>es_gr_we</code></span><span>这条指令<b>真的会写</b>通用寄存器（store / 分支不写）</span>
+  <span class="k"><code>es_dest != 0</code></span><span>目标不是 <code>$r0</code>（<code>$r0</code> 恒为 0，写了也丢弃）</span>
+  <span class="k"><code>rf_raddr1 == dest</code></span><span>我这条指令<b>用的正是</b>那个寄存器</span>
+  <span class="k"><code>ds_use_rj</code></span><span>我这条指令<b>真的把 rj 当源操作数用</b>（见 §7 情况 3）</span>
+</div>
+
+<h3>6.5 Load-Use：前递解决不了的那一种</h3>
+
+<p>看这条序列：</p>
+<pre><code>ld.w  $r5, 0($r1)      <span class="cmt">// A：从内存读</span>
+add.w $r6, $r5, $r7    <span class="cmt">// B：要用 $r5</span></code></pre>
+
+<p>A 到 EXE 级时，<b>它手里还没有数据</b>——它只算出了地址。真正的数据要等 A 走到 <b>MEM 级</b>、
+从 <code>data_ram</code> 读回来才有。<b>EXE 级前递递不出一个"还不存在的值"</b>。</p>
+
+<div class="box dang">
+<b>所以：load 的结果只能从 MEM / WB 前递。若消费者紧跟在 load 后面（差 1 条），
+必须阻塞 1 拍，把"差 1"变成"差 2"，再从 MEM 前递。</b>
+这就是 Load-Use 阻塞，也叫 load delay slot / pipeline interlock。
+</div>
+
+<pre><code><span class="cmt">// ID_stage.v</span>
+<span class="kw">assign</span> load_stall = es_is_load &amp;&amp; (
+    (ds_use_rj  &amp;&amp; (rf_raddr1 != 5'd0) &amp;&amp; (rf_raddr1 == es_forward_dest)) ||
+    (ds_use_rkd &amp;&amp; (rf_raddr2 != 5'd0) &amp;&amp; (rf_raddr2 == es_forward_dest))
+);
+
+<span class="kw">assign</span> ds_ready_go = ~load_stall &amp; ~div_stall &amp; ~mul_stall &amp; ~branch_load_stall;</code></pre>
+
+<h4>阻塞时流水线发生什么（对照时序表看）</h4>
+<table>
+<thead><tr><th style="width:60px">周期</th><th style="width:90px">IF</th><th style="width:90px">ID</th><th style="width:90px">EXE</th><th style="width:90px">MEM</th><th style="width:90px">WB</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>—</td><td>add(B)</td><td>ld(A)</td><td>—</td><td>—</td><td><code>es_is_load=1</code>，dest=5，B 用 rj=5 → <b>load_stall=1</b></td></tr>
+<tr><td>2</td><td>—</td><td><b>add(B) 冻结</b></td><td><b>气泡</b></td><td>ld(A)</td><td>—</td><td>ID 不往下送，EXE 收到"空"；A 进入 MEM 读 RAM</td></tr>
+<tr><td>3</td><td>—</td><td>add(B)</td><td>add(B)</td><td>气泡</td><td>ld(A)</td><td>B 终于进 EXE，<b>同一拍从 MEM 前递拿到 $r5</b></td></tr>
+</tbody>
+</table>
+
+<div class="box note">
+<b>注意第 2 拍</b>：ID 冻结的同时，<code>ds_allowin=0</code> → <code>fs_allowin=0</code> → IF 也冻结，
+<b>整条流水线一起停一拍</b>，而不是只有 ID 停。这正是 §2.4 讲的阻塞传播。
+</div>
+
+<!-- ======================= §7 ======================= -->
+<h2 id="s7">7 · 特殊情况全覆盖清单</h2>
+
+<p>下面每一条都是<b>真实会出错或真实会浪费周期</b>的情况。汇报时老师追问"你考虑了哪些边界"，照这个答。</p>
+
+<h3>情况 1 · 目标寄存器是 <code>$r0</code>（x0 恒零）</h3>
+<pre><code>add.w $r0, $r1, $r2    <span class="cmt">// 写 $r0，约定上丢弃</span>
+add.w $r6, $r0, $r7    <span class="cmt">// $r0 必须读到 0</span></code></pre>
+<p>三处保护：前递源要求 <code>dest != 5'd0</code>；阻塞判断要求 <code>rf_raddr != 5'd0</code>；
+<code>RegFiles</code> 里 <code>raddr==0</code> 直接返回 <code>32'h0</code>。<br>
+<b>漏掉会怎样</b>：前递会把 add 的结果当成"新的 $r0 值"递出去，<code>$r0</code> 不再是 0，后续所有依赖零寄存器的指令全错。</p>
+
+<h3>情况 2 · 写者根本不写寄存器</h3>
+<p>分支、<code>st.w</code>、无条件跳转都不写通用寄存器。若只看 <code>dest</code> 相等就前递，
+会把 store 的"地址"（<code>alu_result</code>）当成"结果"递给下一条指令。<br>
+保护：<code>es_forward_valid</code> 里有 <code>es_gr_we</code>。</p>
+
+<h3>情况 3 · 消费者这条指令<b>根本不用</b>那个源（最容易漏）</h3>
+<p>很多指令的 <code>rk</code> 字段<b>不是寄存器号而是立即数的一部分</b>。例如：</p>
+<ul>
+<li><code>addi.w $rd, $rj, si12</code> —— <code>rk</code> 位实际是 <code>i12[4:0]</code></li>
+<li><code>slli.w $rd, $rj, ui5</code> —— <code>rk</code> 位就是移位量 <code>ui5</code></li>
+<li><code>jirl</code> —— <code>rk</code> 位是 <code>si16</code> 的高位</li>
+</ul>
+<p>这些时候 <code>rf_raddr2 = rk</code> 是<b>一个立即数碰巧等于某个寄存器号</b>。
+若不加 <code>ds_use_rkd</code> 判断，会：</p>
+<ul>
+<li><b>误前递</b>：<code>rkd_value</code> 被换成别的值（多数情况下因为 <code>src2_is_imm</code> 用不到它而无害，但很脏）；</li>
+<li><b>误阻塞</b>：<code>load_stall</code> 无谓拉高 → <b>白白损失一个周期</b>（性能问题，不是功能问题）。</p>
+</ul>
+<div class="box ok">
+<b>本工程的写法</b>：显式列出每条指令"到底用不用 rj / rkd"，得到 <code>ds_use_rj</code> 和 <code>ds_use_rkd</code>，
+两个判断<b>同时</b>用于前递条件和阻塞条件。
+</div>
+
+<h3>情况 4 · store 的第二源是 <code>rd</code> 不是 <code>rk</code></h3>
+<pre><code><span class="kw">assign</span> src_reg_is_rd = inst_beq | inst_bne | inst_st_all
+                     | inst_blt | inst_bge | inst_bltu | inst_bgeu;
+<span class="kw">assign</span> rf_raddr2 = src_reg_is_rd ? rd : rk;</code></pre>
+<p>LA32R 中 <code>st.w $rd, $rj, si12</code> 里<b>要存的数据在 rd 位</b>，地址基址在 <code>rj</code>。
+所以 store / 条件分支的"第二源"要读 <code>rd</code>。<br>
+<b>漏掉会怎样</b>：<code>ld.w $r5</code> 紧跟 <code>st.w $r5, ...</code> 时，<code>load_stall</code> 判的是 <code>rk</code> 位，
+发现不相等 → 不阻塞 → <b>把旧值写进内存</b>，这是真错误。</p>
+
+<h3>情况 5 · load → load（地址相关）</h3>
+<pre><code>ld.w $r5, 0($r1)
+ld.w $r6, 0($r5)     <span class="cmt">// 地址依赖 $r5</span></code></pre>
+<p>第二条 load 的 <code>ds_use_rj = 1</code>（<code>inst_ld_all</code> 在列表里），<code>rf_raddr1 = 5</code> → 阻塞 1 拍 ✅。</p>
+
+<h3>情况 6 · load → 分支（控制 + 数据双重相关）</h3>
+<pre><code>ld.w  $r5, 0($r1)
+beq   $r5, $r6, label   <span class="cmt">// 要拿 $r5 比较</span></code></pre>
+<p><code>inst_beq</code> 在 <code>ds_use_rj</code> 和 <code>ds_use_rkd</code> 列表里，两个源都能触发 <code>load_stall</code> ✅。<br>
+<span class="tag ch5">第 5 章补充</span>本工程额外加了 <code>branch_load_stall</code>，让分支<b>再多等一拍</b>走 WB 前递——
+这是为了<b>切断时序长路径</b>（<code>data_ram → 分支比较 → IF → inst_ram</code>），不是功能必需。</p>
+
+<h3>情况 7 · 同一寄存器被连续写三次（优先级检验）</h3>
+<pre><code>add.w $r5, $r1, $r2    <span class="cmt">// 此时已在 WB</span>
+add.w $r5, $r3, $r4    <span class="cmt">// 此时已在 MEM</span>
+add.w $r5, $r6, $r7    <span class="cmt">// 此时在 EXE（最新）</span>
+sub.w $r8, $r5, $r9    <span class="cmt">// ID：必须拿 EXE 那条的结果</span></code></pre>
+<p>四级 MUX 从上往下判，第一条命中就返回 → 取到 EXE 的值 ✅。<b>优先级反了就会取到 WB 的旧值。</b></p>
+
+<h3>情况 8 · 乘法 / 除法结果不参与 EXE 前递 <span class="tag ch5">第 5 章</span></h3>
+<p>乘法器延迟大，除法要多拍。它们的处理方式和 Load-Use <b>完全同构</b>，只是换了触发条件：</p>
+<pre><code><span class="kw">assign</span> div_stall = es_is_div &amp;&amp; !es_div_ready &amp;&amp; ( ...源寄存器命中... );
+<span class="kw">assign</span> mul_stall = es_is_mul               &amp;&amp; ( ...源寄存器命中... );</code></pre>
+<p>第 1、2 章先记住一句：<b>"谁的 EXE 级结果不可用时，就把消费者堵在 ID 一拍"</b>，
+后面章节只是往 <code>load_stall</code> 旁边再加几个同构的 <code>xxx_stall</code>。</p>
+
+<h3>情况 9 · "第四条前递通路"——寄存器堆内部直通</h3>
+<pre><code><span class="cmt">// RegFiles.v</span>
+<span class="kw">assign</span> rdata1 = (raddr1 == 5'b0)            ? 32'h0 :
+                (wen &amp;&amp; (raddr1 == waddr))  ? wdata : rf[raddr1];</code></pre>
+<p>WB 级这一拍正在写 <code>$r5</code>，ID 这一拍正好读 <code>$r5</code>：
+<code>rf[5]</code> 还是旧值（要到本拍时钟沿才更新），所以这里<b>直接把正在写的 wdata 送出去</b>。
+它和外部 <code>ws_forward</code> 做的是同一件事——<b>冗余但零成本</b>，属于双保险。</p>
+
+<h3>情况 10 · 复位后的"气泡"</h3>
+<p>复位时五级全部 <code>valid=0</code>。第 1 拍只有 IF 拿到 <code>to_fs_valid=1</code>，
+要等 <b>5 拍</b> 第一条指令才到 WB。这 5 拍里各级的 <code>valid</code> 都是 0，
+<b>下游不会把气泡当成有效指令执行</b>——这就是 <code>valid</code> 位的价值。</p>
+
+<hr>
+
+<h3>7.1 汇报时的三句话提纲</h3>
+<div class="box ok">
+<ol style="margin:6px 0 0 18px">
+<li><b>骨架</b>：五级流水 IF/ID/EXE/MEM/WB，每级之间用"数据总线 + valid 位"构成的流水线缓存隔断，
+级间用 <code>valid / ready_go / allowin</code> 三信号握手，阻塞沿 <code>allowin</code> 逐级向前传播。</li>
+<li><b>存储</b>：指令 RAM 与数据 RAM 都做成同步 BRAM，<code>en</code> 作片选、<code>we[3:0]</code> 作字节写使能，
+地址取 <code>[19:2]</code> 转成字地址；数据口经 <code>bridge_1x2</code> 按地址译码在 data_ram 与 confreg 之间片选。</li>
+<li><b>冲突</b>：只处理 RAW。三级前递 EXE&gt;MEM&gt;WB（越新越优先），
+load 结果最早只能从 MEM 前递，因此"load 后紧跟消费者"必须用 <code>load_stall</code> 阻塞一拍；
+所有阻塞、前递判断都要排除 <code>$r0</code>、排除不写寄存器的指令、排除不用该源的指令。</li>
+</ol>
+</div>
+
+<h3>7.2 老师可能追问 & 标准答案</h3>
+<table>
+<thead><tr><th style="width:280px">问题</th><th>怎么答</th></tr></thead>
+<tbody>
+<tr><td>流水线为什么能加速？</td><td>不是单条变快，是<b>吞吐率</b>提升：理想 CPI → 1。单条指令的延迟反而略增（多了级间寄存器）。</td></tr>
+<tr><td>为什么必须有级间寄存器？</td><td>否则新值会<b>组合地</b>穿透到后级，把上一条指令的中间结果冲掉。</td></tr>
+<tr><td>ready_go 和 allowin 区别？</td><td><code>ready_go</code> 是<b>本级自己</b>干完没（内部原因）；<code>allowin</code> 是<b>后级</b>收不收（外部原因）。两个都满足才能前进。</td></tr>
+<tr><td>为什么 WB 的 allowin 没有后级项？</td><td>它是最后一级，下游是寄存器堆，永远可写，不会反压。</td></tr>
+<tr><td>前递优先级为什么 EXE 最高？</td><td>越靠前的级指令越新，同一寄存器多次写入时应取<b>最新</b>的那次。</td></tr>
+<tr><td>load 为什么必须阻塞一拍？</td><td>load 在 EXE 级只有地址没有数据，数据要等 MEM 级读 RAM 才有，<b>前递递不出不存在的值</b>。</td></tr>
+<tr><td>分支怎么处理的？</td><td>分支在 ID 级判断，<code>br_taken=1</code> 时组合地把 <code>fs_to_ds_valid</code> 拉低，取消已预取的那条；代价 1 个周期，LA32R 无延迟槽。</td></tr>
+<tr><td>代价与不足？</td><td>分支固定损失 1 拍；Load-Use 损失 1 拍；未做 Cache / 分支预测 / 乱序（可列为后续工作）。</td></tr>
+</tbody>
+</table>
+
+<p class="small center" style="margin-top:30px;color:#888780">
+本讲义所有代码片段均取自 <code>cdp_ede_local-master/mycpu_env/myCPU/</code> 下的真实 RTL（含第 3–5 章扩展，已用标签标注）。<br>
+配套：<code>CPU实现情况分析报告.html</code>（全局设计与缺陷）、<code>EXP4_Vivado实验指南.html</code>（操作与验证流程）。
+</p>
+
+</div>
+</body>
+</html>

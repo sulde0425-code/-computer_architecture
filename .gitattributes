@@ -1,0 +1,32 @@
+# 统一行尾：文本入库为 LF，检出按平台自动转换
+* text=auto
+
+# 源码 / 约束 / 脚本
+*.v     text
+*.sv    text
+*.vh    text
+*.vhd   text
+*.xdc   text
+*.tcl   text
+*.xpr   text
+*.xci   text
+*.c     text
+*.h     text
+*.S     text
+*.lds   text
+Makefile text
+
+# Shell 脚本必须 LF（否则 bash 报 ^M 错误）
+*.sh    text eol=lf
+
+# 数据 / 镜像 / 文档
+*.coe   text
+*.mif   text
+*.md    text
+*.html  text
+
+# 二进制
+*.bit   binary
+*.dcp   binary
+*.wdb   binary
+*.pdf   binary

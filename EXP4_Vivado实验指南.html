@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>EXP4 在 Vivado 里怎么做 · 怎么判断成功</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --card:#ffffff; --ink:#1f2328; --ink2:#57606a; --line:#e3e6ea;
+    --blue:#0b62d0; --blue-bg:#eef4fd; --green:#1a7f4b; --green-bg:#eaf7f0;
+    --red:#c62828; --red-bg:#fdecec; --amber:#a15c00; --amber-bg:#fff6e5;
+    --mono:"JetBrains Mono","Cascadia Mono",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+       font-size:14.5px;line-height:1.75}
+  .wrap{max-width:1010px;margin:0 auto;padding:36px 28px 80px}
+  h1{font-size:26px;margin:0 0 6px;letter-spacing:-.3px}
+  .sub{color:var(--ink2);font-size:13.5px;margin-bottom:26px}
+  h2{font-size:19px;margin:38px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  h3{font-size:15.5px;margin:24px 0 8px;color:#111}
+  p{margin:8px 0}
+  code{font-family:var(--mono);font-size:12.6px;background:#eef1f4;
+       padding:1.5px 5px;border-radius:4px;color:#0d3d75}
+  pre{font-family:var(--mono);font-size:12.4px;background:#1e2430;color:#d8e2f0;
+      padding:13px 15px;border-radius:8px;overflow-x:auto;line-height:1.6;margin:10px 0}
+  pre .c{color:#7d8ba3}
+  pre .g{color:#7ee0a0}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.3px;background:var(--card)}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:#f0f3f6;font-weight:600}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:16px 20px;margin:16px 0}
+  .note{background:var(--blue-bg);border:1px solid #c8defa;border-left:4px solid var(--blue);
+        border-radius:8px;padding:12px 16px;margin:16px 0}
+  .ok{background:var(--green-bg);border:1px solid #c7e8d5;border-left:4px solid var(--green);
+      border-radius:8px;padding:12px 16px;margin:16px 0}
+  .warn{background:var(--amber-bg);border:1px solid #f3ddb0;border-left:4px solid var(--amber);
+        border-radius:8px;padding:12px 16px;margin:16px 0}
+  .danger{background:var(--red-bg);border:1px solid #f5c6c6;border-left:4px solid var(--red);
+          border-radius:8px;padding:12px 16px;margin:16px 0}
+  .note b,.ok b,.warn b,.danger b{color:inherit}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:4px 20px 16px;margin:14px 0}
+  .step .no{display:inline-block;background:var(--blue);color:#fff;font-weight:700;
+            font-size:12px;border-radius:20px;padding:2px 11px;margin:14px 0 6px}
+  ul,ol{margin:8px 0;padding-left:22px}
+  li{margin:5px 0}
+  .mono{font-family:var(--mono);font-size:12.6px}
+  .tag{display:inline-block;font-size:11.5px;font-weight:700;border-radius:5px;
+       padding:1px 8px;margin-right:6px}
+  .t-ok{background:var(--green-bg);color:var(--green)}
+  .t-bad{background:var(--red-bg);color:var(--red)}
+  .t-warn{background:var(--amber-bg);color:var(--amber)}
+  .kbd{font-family:var(--mono);font-size:12px;background:#fff;border:1px solid #c9ced6;
+       border-bottom-width:2px;border-radius:4px;padding:1px 6px}
+  .fine{font-size:12.6px;color:var(--ink2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>EXP4 在 Vivado 里怎么做 · 怎么判断成功</h1>
+<div class="sub">教材第 3 章「算术逻辑转移类指令的添加」· 参考镜像 <code>for_test_obj/ex4_obj</code> · 工程 <code>soc_bram/run_vivado/project/loongson.xpr</code></div>
+
+<div class="note">
+<b>先说结论（本地已实测）：</b>本工程的 EXP4 在真实 Vivado 工程里跑行为仿真，结果是
+<b>29 个功能测试点全部 PASS、指令级比对零错误、结尾打印 <code>----PASS!!!</code></b>。
+所以 EXP4 这一章在<strong>功能层面是完全正确的</strong>。下面的指南告诉你怎样自己把这件事复现出来。
+</div>
+
+<h2>0 · 对应关系：EXP4 是哪一个？</h2>
+
+<div class="note">
+<code>for_test_obj/</code> 下的 9 套镜像与 9 个实验一一对应：
+<table style="margin-top:10px">
+<thead><tr><th style="width:130px">镜像</th><th>内容</th><th style="width:130px">教材位置</th></tr></thead>
+<tbody>
+<tr><td class="mono">ex1_obj / ex2_obj</td><td>五级流水骨架、冲突（阻塞）处理</td><td>第 1、2 章</td></tr>
+<tr><td class="mono">ex3_obj</td><td>数据前递</td><td>第 2 章</td></tr>
+<tr style="background:#eef4fd"><td class="mono"><b>ex4_obj</b></td><td><b>slti、sltui、andi、ori、xori、sll、srl、sra、pcaddu12i</b></td><td><b>第 3 章 · 本指南</b></td></tr>
+<tr><td class="mono">ex5_obj</td><td>blt、bge、bltu、bgeu 转移指令</td><td>第 3 章</td></tr>
+<tr><td class="mono">ex6_obj</td><td>ld.b / ld.h / ld.bu / ld.hu / st.b / st.h</td><td>第 4 章</td></tr>
+<tr><td class="mono">ex7_obj</td><td>mul.w / mulh.w / mulh.wu / div.w / mod.w / div.wu / mod.wu</td><td>第 5 章</td></tr>
+<tr><td class="mono">ex8_obj / ex9_obj</td><td>异常与中断</td><td>第 6 章</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="s09">0.5 · 切换章节：以 EXP6（第 4 章 · 访存指令）为例</h2>
+
+<p>本指南正文以 EXP4 为例，但<strong>流程对任意章节完全通用</strong>。下面给出切到 <b>EXP6</b> 的完整参数与命令。</p>
+
+<div class="note">
+<b>EXP6 = 教材第 4 章「访存指令的添加」</b>，对应镜像 <code>for_test_obj/ex6_obj</code>，
+验证指令 <code>ld.b / ld.h / ld.w / ld.bu / ld.hu / st.b / st.h / st.w</code>，
+共 <b>39 个功能测试点</b>（编号 01→39）。<br>
+<span class="fine">判别指纹：<code>inst_ram.coe</code> md5 = <code class="mono">a76338349250a0465346deb004e4c1db</code>，
+共 123101 字；与 ex5 的第 8224 个字即不同（ex5=<code>5080d800</code>，ex6=<code>50810800</code>）。</span>
+</div>
+
+<h3>0.5.1 一键切换（推荐，带校验与回滚备份）</h3>
+<pre><span class="c"># 在 Main_project_1.1/ 下执行</span>
+bash .workbuddy/sim/switch_exp.sh 6</pre>
+<p>它会做三件事：</p>
+<ol>
+<li>把旧镜像 + 旧 <code>golden_trace.txt</code> 备份到 <code>mycpu_env/.bak_&lt;时间戳&gt;/</code>；</li>
+<li>把 <code>ex6_obj</code> 的 <code>.coe</code>/<code>.mif</code> 同步到 <b>三个</b>位置（见下一节）；</li>
+<li>逐项 <code>cmp</code> 校验，任何一处不一致就报错退出。</li>
+</ol>
+
+<div class="danger">
+<b>必须同步的三个位置（漏一处就会"仿真对、上板错"）：</b>
+<table style="margin-top:8px">
+<thead><tr><th style="width:280px">文件</th><th>谁读它</th></tr></thead>
+<tbody>
+<tr><td class="mono">func/obj/inst_ram.coe</td><td><b>综合</b>：<code>inst_ram.xci</code> 的 <code>Coe_File</code> 指向这里</td></tr>
+<tr><td class="mono">func/obj/inst_ram.mif</td><td><b>仿真</b>：<code>sync_ram.v</code> 的 <code>$readmemb</code> 写死了这个相对路径</td></tr>
+<tr><td class="mono">xilinx_ip/inst_ram/inst_ram.mif</td><td><b>generate_target</b> 生成 IP 产物时读这里</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>0.5.2 出 bit —— 关键在于必须重跑 IP 的 OOC 综合</h3>
+
+<div class="danger">
+<b>★ 这是本项目最大的坑，也是之前「每章都 69 分」的根因。</b><br><br>
+<code>inst_ram</code> 是 blk_mem_gen IP，采用 <b>OOC（out-of-context）综合</b>。
+主综合 <code>synth_1</code> 只引用它的 <b>stub</b>，真正把程序数据烧进 BRAM 的是
+<code>loongson.runs/inst_ram_synth_1/inst_ram.dcp</code>。<br><br>
+换 <code>Coe_File</code> 后：
+<ul style="margin:8px 0 0 18px">
+<li><code>generate_target</code> <b>只</b>更新 IP 目录下的 <code>.mif</code> 和仿真模型，<b>不会</b>重跑该 dcp；</li>
+<li>只做 <code>reset_run synth_1</code> 也不行 —— Vivado 会认为 IP
+"<span class="mono">checkpoint is already up-to-date</span>" 而跳过，bit 里仍是<b>上一套程序</b>。</li>
+</ul>
+<br>
+<b>必须显式重跑 OOC run：</b>
+<pre>reset_target all [get_ips inst_ram]
+generate_target all [get_ips inst_ram]
+reset_run  inst_ram_synth_1      <span class="c"># ← 缺了这步，程序就换不掉</span>
+launch_runs inst_ram_synth_1 -jobs 16
+wait_on_run inst_ram_synth_1</pre>
+</div>
+
+<p>上面全部步骤已封装进脚本，一条命令即可：</p>
+<pre>D:/Xilinx/Vivado/2023.2/bin/vivado.bat -mode batch -source .workbuddy/sim/rebuild_bit_expN.tcl -tclargs 6</pre>
+<p class="fine">脚本会自动：disable 原 <code>soc_lite_top.xdc</code>（PPT 教程步骤 5）→ 重跑 IP OOC → 主综合 →
+实现 → 出 bit → 导出时序/资源报告 → <b>按实验号归档</b>为
+<code>.workbuddy/sim/exp6/looongson_remote_top_EXP6.bit</code> 并在工程根目录放一份同名文件。全程约 13 分钟。</p>
+
+<h3>0.5.3 出完 bit 怎么确认装的是不是 ex6</h3>
+<p>看 OOC 产物的时间戳，<b>必须比你换镜像的时间更晚</b>：</p>
+<pre>ls -l --time-style=+"%m-%d %H:%M" \
+  cdp_ede_local-master/mycpu_env/soc_verify/soc_bram/run_vivado/project/loongson.runs/inst_ram_synth_1/inst_ram.dcp</pre>
+<p>更严格的做法是从 dcp 里把 BRAM 的 <code>INIT_00</code> 抽出来，反推前几个字节与 <code>ex6_obj/inst_ram.coe</code> 比对
+（<span class="fine">ex6 的头 8 个字与 ex4/ex5 相同，所以用前 8 字节判别不出来，要取
+<code>word[8224]=50810800</code> 附近的区域</span>）。</p>
+
+<h2>1 · 必须先搞懂的一件事：仿真和综合，读的镜像文件不是同一个</h2>
+
+<p>这是整个流程里<strong>最容易踩空</strong>的地方，也是很多人"明明改了程序却测的还是旧程序"的根因。</p>
+
+<table>
+<thead><tr><th style="width:150px">场合</th><th>谁来提供存储器</th><th>从哪里取程序/数据</th><th>换镜像要动什么</th></tr></thead>
+<tbody>
+<tr>
+<td><b>行为仿真</b><br><span class="fine">Run Behavioral Simulation</span></td>
+<td><code>testbench/sync_ram.v</code> 里用 <code>$readmemb</code> 写的<strong>行为级 RAM</strong>。<br>
+    <span class="fine">它定义了同名的 <code>inst_ram</code>/<code>data_ram</code>，编译时<strong>覆盖</strong>掉 Xilinx IP 的版本（日志里会有 <code>VRFC 10-3609 overwriting previous definition</code> 的 WARNING，这是<strong>正常且预期</strong>的）。</span></td>
+<td class="mono">func/obj/inst_ram.mif<br>func/obj/data_ram.mif</td>
+<td>只复制两个 <b><code>.mif</code></b></td>
+</tr>
+<tr>
+<td><b>综合 / 实现 / 出 bit</b><br><span class="fine">Run Synthesis → Bitstream</span></td>
+<td>Xilinx IP <code>inst_ram</code> / <code>data_ram</code></td>
+<td class="mono">func/obj/inst_ram.coe<br><span class="fine">（写在 inst_ram.xci 的 Coe_File 里，Load_Init_File=true）</span><br>
+    <span class="fine">data_ram 的 Load_Init_File=<b>false</b>，即综合出来无初值，靠程序自己写</span></td>
+<td>复制 <b><code>.coe</code></b>，并 <b>Reset + Generate Output Products</b></td>
+</tr>
+</tbody>
+</table>
+
+<div class="danger">
+<b>两条铁律：</b><br>
+① 只跑仿真 → 复制 <code>.mif</code> 就够了，<b>不需要</b>动 IP；<br>
+② 要出 bit 上板/上传 → 必须复制 <code>.coe</code> 并<b>重新生成 IP 输出产物</b>（IP 的初始化数据在生成时就固化了，只换文件不重生成=没换）。
+</div>
+
+<h3>1.1 先确认当前装的是哪一套</h3>
+<p>光看文件名看不出来。用校验值比对，几秒钟就能确定：</p>
+<pre><span class="c"># 在工程根目录 Main_project_1.1/ 下执行</span>
+for d in for_test_obj/ex*_obj; do printf "%-24s " "$d"; md5sum "$d/inst_ram.coe" | cut -d' ' -f1; done
+echo -n "当前 func/obj 装的是:  "; md5sum cdp_ede_local-master/mycpu_env/func/obj/inst_ram.coe | cut -d' ' -f1</pre>
+<p class="fine">EXP4 的 <code>inst_ram.coe</code> 校验值应为 <code class="mono">ae68ae9f8608137892c477ef6dd2c5f1</code>。</p>
+
+<h2>2 · 流程 A：行为仿真（判断"功能对不对"）</h2>
+
+<div class="step">
+<span class="no">步骤 1</span> 装入 EXP4 的镜像（仿真只需两个 .mif）
+<pre>cp for_test_obj/ex4_obj/inst_ram.mif  cdp_ede_local-master/mycpu_env/func/obj/inst_ram.mif
+cp for_test_obj/ex4_obj/data_ram.mif  cdp_ede_local-master/mycpu_env/func/obj/data_ram.mif</pre>
+<span class="fine">路径必须就是 <code>mycpu_env/func/obj/</code>：<code>sync_ram.v</code> 里写死了相对路径
+<code>../../../../../../../../func/obj/inst_ram.mif</code>，换别处它读不到。</span>
+</div>
+
+<div class="step">
+<span class="no">步骤 2</span> 重新生成 <code>golden_trace.txt</code>（<b>漏了这步仿真必然满屏报错</b>）
+<p>测试平台把每条指令的 <code>PC / 写哪个寄存器 / 写了什么值</code> 与"黄金模型"逐条比对，所以黄金 trace 必须和当前镜像同源。打开
+<code>mycpu_env/gettrace/gettrace.xpr</code>，直接 <b>Run Simulation → Run Behavioral Simulation</b>，跑完自动写出
+<code>mycpu_env/gettrace/golden_trace.txt</code>。</p>
+<p>这个黄金模型是<strong>纯 Verilog</strong>，<strong>不需要交叉编译工具链</strong>，只要能跑 xsim 就行。</p>
+<p><b>成功标志：</b>日志里出现 <code>gettrace end!</code> 和 <code>----Succeed in generating trace file!</code>，
+并且 <code>golden_trace.txt</code> 被刷新。<b>EXP4 应为 62377 行。</b></p>
+</div>
+
+<div class="step">
+<span class="no">步骤 3</span> 跑 CPU 的行为仿真
+<ol>
+<li>打开 <code>cdp_ede_local-master/mycpu_env/soc_verify/soc_bram/run_vivado/project/loongson.xpr</code></li>
+<li><b>Flow Navigator → Simulation → Run Simulation → Run Behavioral Simulation</b></li>
+<li>看底部 <b>Tcl Console</b> 的输出</li>
+</ol>
+<p>Tcl Console 等价命令（不想点鼠标就贴这个）：</p>
+<pre>set_property top tb_top [get_filesets sim_1]
+launch_simulation
+run 5 ms        <span class="c"># 不要用 run all，理由见下</span>
+close_sim</pre>
+</div>
+
+<div class="warn">
+<b>为什么是 <code>run 5 ms</code> 而不是 <code>run all</code>：</b>测试平台里有个
+<code>while(num_monitor)</code> 循环，只要测试点计数还在变就一直打印 <code>Test is running…</code>。
+CPU 一旦跑飞，这个循环永不退出，<code>run all</code> 会一直挂着不返回。给个时间上限就能安全收尾。
+（EXP4 正常情况在 806&nbsp;µs 左右就自己 <code>$finish</code> 了，5&nbsp;ms 绰绰有余。）
+</div>
+
+<div class="danger">
+<b>★★ 最常见的"仿真没反应"陷阱：<code>launch_simulation</code> 只跑 1000 ns ★★</b>
+<p>Vivado 点 <b>Run Behavioral Simulation</b> 时，会自动生成一个 tclbatch 文件，它的最后一行是
+<b><code>run 1000ns</code></b>（可以打开 <code>loongson.sim/sim_1/behav/xsim/tb_top.tcl</code> 自己看）。也就是说
+<code>launch_simulation</code> 跑完就返回时，仿真<strong>只推进了 1000 ns</strong>，日志末尾会写：</p>
+<pre>INFO: [USF-XSim-97] XSim simulation ran for 1000ns</pre>
+<p>而 <code>mycpu_tb.v</code> 里复位要在 <b>2000 ns</b> 才释放：</p>
+<pre>resetn = 1'b0;
+#2000;
+resetn = 1'b1;   <span class="c">// ← 2000ns 之前 CPU 根本没开始工作</span></pre>
+<p>所以 1000 ns 时<strong>连 <code>Test begin!</code> 都不会打印</strong>，看起来像"什么都没发生"。这不是错，是还没跑完。
+EXP4 要跑到约 <b>806 µs</b> 才会 <code>$finish</code>。</p>
+<p><b>正确做法</b> —— 在仿真已启动的状态下，往底部 Tcl Console 再补一条命令：</p>
+<pre>run 5 ms        <span class="c"># 或点菜单 Run → Run for 5 ms</span>
+close_sim       <span class="c"># 看完结果再关</span></pre>
+<p>完整日志落在 <code>loongson.sim/sim_1/behav/xsim/simulate.log</code>，可以直接搜 <code>PASS</code> 和 <code>Error</code>。</p>
+</div>
+
+<div class="ok">
+<b>一键脚本：</b>上面步骤 1+2+3 已经串成 <code>.workbuddy/sim/verify_exp4.tcl</code>（里面已经用了 <code>run 5 ms</code>）。在工程根目录执行：
+<pre>D:/Xilinx/Vivado/2023.2/bin/vivado.bat -mode batch -source .workbuddy/sim/verify_exp4.tcl</pre>
+它会自动换镜像 → 重生成 golden_trace → 跑 EXP4 仿真 → 打印结果。实测约 1 分半跑完。
+</div>
+
+<h2>3 · 流程 B：综合实现出 bit（判断"能不能上板"）</h2>
+
+<div class="step">
+<span class="no">步骤 1</span> 装入 EXP4 的 <b>.coe</b>（综合用这个）
+<pre>cp for_test_obj/ex4_obj/inst_ram.coe  cdp_ede_local-master/mycpu_env/func/obj/inst_ram.coe
+cp for_test_obj/ex4_obj/data_ram.coe  cdp_ede_local-master/mycpu_env/func/obj/data_ram.coe</pre>
+</div>
+
+<div class="step">
+<span class="no">步骤 2</span> 重新生成 <code>inst_ram</code> 的 IP 输出产物
+<p><b>GUI：</b>Sources 面板 → <b>IP Sources</b> → 找到 <code>inst_ram</code> → 右键 <b>Reset Output Products</b> → 再右键 <b>Generate Output Products</b>。</p>
+<p><b>Tcl：</b></p>
+<pre>reset_target all [get_ips inst_ram]
+generate_target all [get_ips inst_ram]</pre>
+</div>
+
+<div class="step">
+<span class="no">步骤 3</span> 综合 → 实现 → 出 bit
+<ol>
+<li><b>Run Synthesis</b></li>
+<li><b>Run Implementation</b></li>
+<li><b>Generate Bitstream</b></li>
+<li>看 <b>Reports → Timing Summary</b>（或 Tcl：<code>open_run impl_1</code> + <code>report_timing_summary</code>）</li>
+</ol>
+</div>
+
+<p>板级时钟链：外部 <code>clk</code> 100&nbsp;MHz → PLL 分频 → <code>cpu_clk_clk_pll</code> <b>50&nbsp;MHz（周期 20&nbsp;ns）</b>。</p>
+
+<h2>4 · 怎么判断实验成功（核心）</h2>
+
+<h3>4.1 仿真：四个信号，全部满足才算通过</h3>
+
+<table>
+<thead><tr><th style="width:52px"></th><th style="width:430px">日志里应该看到</th><th>含义</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t-ok">①</span></td>
+    <td class="mono">Test begin!</td>
+    <td>测试开始</td></tr>
+<tr><td><span class="tag t-ok">②</span></td>
+    <td class="mono">----[&nbsp;&nbsp;&nbsp;12105 ns] Number 8'd01 Functional Test Point PASS!!!<br>
+        ----[&nbsp;&nbsp;&nbsp;36515 ns] Number 8'd02 Functional Test Point PASS!!!<br>
+        …<br>----[&nbsp;805635 ns] Number 8'd29 Functional Test Point PASS!!!</td>
+    <td>每点亮一个"功能测试点"打印一行。<b>编号必须从 01 开始严格连续、无跳号无重复</b>——跳号就说明某条指令算错了</td></tr>
+<tr><td><span class="tag t-ok">③</span></td>
+    <td class="mono">==============================================================<br>
+        Test end!<br>
+        <b>----PASS!!!</b></td>
+    <td><b>唯一的"总判定"。</b>全程零错误，结尾必然是 <code>----PASS!!!</code></td></tr>
+<tr><td><span class="tag t-ok">④</span></td>
+    <td>全程搜不到 <code>Error</code> 字样</td>
+    <td>指令级比对错误数 = 0，测试点错误数 = 0</td></tr>
+</tbody>
+</table>
+
+<div class="ok">
+<b>EXP4 的成功判据（本次实测值，可直接对照）：</b>
+<table style="margin-top:10px">
+<tbody>
+<tr><th style="width:230px">功能测试点数</th><td><b>29 个</b>，编号 01→29 连续</td></tr>
+<tr><th>指令级比对错误</th><td><b>0</b></td></tr>
+<tr><th>最后一个功能测试点的时间</th><td class="mono">805635 ns</td></tr>
+<tr><th>结束时间</th><td class="mono">806125 ns（程序 <code>$finish</code>）</td></tr>
+<tr><th>结尾</th><td class="mono"><b>----PASS!!!</b></td></tr>
+</tbody>
+</table>
+<p style="margin-top:10px">日志里还会穿插两类"看起来像错误、其实正常"的行，不用管：</p>
+<ul style="margin-bottom:0">
+<li><code class="mono">Test is running, debug_wb_pc = 0x…</code> —— 每 10&nbsp;µs 一句进度心跳；</li>
+<li>程序自己往 UART 写的字符（<code>$write("%c", uart_data)</code>）—— 测试程序自己的打印，用于人工核对。</li>
+</ul>
+</div>
+
+<h3>4.2 失败信号对照表</h3>
+
+<table>
+<thead><tr><th style="width:330px">日志里的字样</th><th>含义</th><th>先查什么</th></tr></thead>
+<tbody>
+<tr><td class="mono">[t] Error!!!<br>reference: PC = 0x…, wb_rf_wnum = 0x…, wb_rf_wdata = 0x…<br>mycpu&nbsp;&nbsp;&nbsp;: PC = 0x…, wb_rf_wnum = 0x…, wb_rf_wdata = 0x…</td>
+    <td><b>最致命。</b>某条指令的 PC / 目标寄存器 / 写回值和黄金模型不一致。<b>打印后立刻 $finish</b>，仿真到此中断，后面的测试点一个都不会有。</td>
+    <td>① 镜像和 <code>golden_trace.txt</code> 是不是同一套（最常见）<br>② 出错的 PC 是不是 EXP4 新增的 9 条指令之一<br>③ 该指令的译码 / 控制信号</td></tr>
+<tr><td class="mono">Error(N)!!! Occurred in number 8'dNN Functional Test Point!</td>
+    <td>测试点编号跳号 → 某条指令算错，程序没能点亮该点</td>
+    <td>编号 NN 对应 <code>ex4_obj/test.s</code> 里第 NN 个测试段，去看那几行汇编</td></tr>
+<tr><td class="mono">Error(N)!!! Unknown, Functional Test Point numbers are unequal!</td>
+    <td>测试点高低位编号不同步</td>
+    <td>一般说明 CPU 跳飞了</td></tr>
+<tr><td class="mono">Fail!!!Total N errors!</td>
+    <td>程序跑到终点，但有 N 个错</td>
+    <td>看上面的 Error 明细定位</td></tr>
+<tr><td>一直刷 <code>Test is running, debug_wb_pc = 0x…</code>，PC 不变或乱跳，且长时间不结束</td>
+    <td>CPU 卡死或跑飞</td>
+    <td>PC 值能反推卡在哪条指令附近</td></tr>
+<tr><td class="mono">VRFC 10-2096 empty statement in sequential block</td>
+    <td><code>mycpu_tb.v</code> 里有空语句，xvlog 直接拒绝编译</td>
+    <td>本工程<strong>已修复</strong>（改为 <code>if(uart_data!=8'hff)</code>）。若又出现，说明文件被还原了</td></tr>
+<tr><td class="mono">VRFC 10-3609 overwriting previous definition of module 'inst_ram'</td>
+    <td><b>正常的 WARNING，不是错误</b></td>
+    <td>这正是 <code>sync_ram.v</code> 的行为级 RAM 覆盖 IP 版本，仿真走的就是行为级</td></tr>
+</tbody>
+</table>
+
+<h3>4.3 上板 / 上传平台的判据</h3>
+<ul>
+<li><b>先看时序：</b>Timing Summary 里 <code>cpu_clk_clk_pll</code> 一行必须 <b>WNS ≥ 0</b> 且 <b>TNS = 0</b>（保持时间 WHS 也 ≥ 0）。
+<b>WNS &lt; 0 的 bit 绝对不要上板</b>——它的错是偶发的（跟温度、电压、布局有关），非常难查，很容易"仿真全过、上板全错"。</li>
+<li><b>板上表现：</b>串口打印测试程序输出；confreg 的 <code>num_monitor</code> 计数递增；程序跑完停在 <code>0x1c000100</code>。</li>
+<li><b>平台评测：</b>上传 bit → 远程 FPGA 自动评测，含功能测试与性能测试两部分。</li>
+</ul>
+
+<h2>5 · EXP4 要验哪些指令</h2>
+
+<p>教材 3.1 节原文："添加算术逻辑运算类指令 slti、sltui、andi、ori、xori、sll、srl、sra、pcaddu12i。<b>运行对应的 func，要求成功通过仿真和上板验证</b>。"</p>
+
+<table>
+<thead><tr><th style="width:120px">镜像</th><th>要添加的指令</th><th style="width:120px">测试点数</th></tr></thead>
+<tbody>
+<tr><td class="mono">ex4_obj</td>
+    <td class="mono">slti、sltui、andi、ori、xori、sll(.w)、srl(.w)、sra(.w)、pcaddu12i</td>
+    <td><b>29</b></td></tr>
+<tr><td class="mono">ex5_obj</td>
+    <td class="mono">blt、bge、bltu、bgeu</td>
+    <td>33 <span class="fine">（同属第 3 章）</span></td></tr>
+</tbody>
+</table>
+
+<div class="note">
+<b>三个已知的编码坑（本 CPU 已在第 3 章修正）：</b>
+<ul>
+<li><code>SLTI = 0x8</code>、<code>SLTUI = 0x9</code>（<code>op[31:26]</code> 属 2RI12 类），极易和 <code>ADDI.W = 0xA</code> 混淆；</li>
+<li><code>SLTUI</code> 的立即数<strong>仍然做符号扩展</strong>，不是零扩展；</li>
+<li>写回使能 <code>gr_we</code> 必须"<b>正向译码</b>"而非"反向屏蔽"——否则未译码的指令会被当成合法指令执行并写坏寄存器堆（症状就是"加了几条指令后，别的章节开始莫名失败"）。</li>
+</ul>
+</div>
+
+<h2>6 · 检查清单（照着打勾）</h2>
+<div class="card">
+<ol style="margin:0">
+<li>镜像换成 <code>ex4_obj</code> 了吗？<code>func/obj/inst_ram.coe</code> / <code>.mif</code> 校验值对不对？</li>
+<li>只跑仿真 → <code>.mif</code> 复制到位即<br>要出 bit → <code>.coe</code> 复制到位 <b>并且</b> Reset + Generate 了 <code>inst_ram</code> IP</li>
+<li><code>gettrace/golden_trace.txt</code> 重新生成了吗？（EXP4 = 62377 行）</li>
+<li>仿真结尾是 <code>----PASS!!!</code> 吗？29 个测试点是否 01→29 连续？</li>
+<li>实现后 <code>cpu_clk_clk_pll</code> 的 WNS ≥ 0 吗？</li>
+<li>准备上传的 bit 是<strong>最后一次</strong>实现出来的那个吗？（改过 RTL 就必须重新生成）</li>
+</ol>
+</div>
+
+<h2>7 · Vivado 日志里那些 WARNING：哪些要管，哪些不用管</h2>
+
+<p>综合 / 仿真跑完，Tcl Console 里会刷一堆 <code>INFO</code> 和 <code>WARNING</code>。本工程正常跑通时<strong>一条 ERROR 都不该有</strong>，下面这些是<strong>常态</strong>，看到不用慌：</p>
+
+<table>
+<thead><tr><th style="width:360px">日志原文</th><th style="width:80px">级别</th><th>要不要管</th></tr></thead>
+<tbody>
+<tr><td class="mono">[USF-XSim-97] XSim simulation ran for 1000ns</td>
+    <td><span class="tag t-bad">注意</span></td>
+    <td><b>要管。</b>说明仿真只跑了 1000 ns 就返回了，需再补 <code>run 5 ms</code>。见上文红框</td></tr>
+<tr><td class="mono">[VRFC 10-3609] overwriting previous definition of module 'inst_ram' / 'data_ram'</td>
+    <td><span class="tag t-ok">正常</span></td>
+    <td><b>不要管，且是好事。</b>这正是 <code>testbench/sync_ram.v</code> 的行为级 RAM 把 IP 版本覆盖掉了——证明仿真读的是 <code>func/obj/*.mif</code></td></tr>
+<tr><td class="mono">[VRFC 10-3129] assignment to input 'dina'</td>
+    <td><span class="tag t-ok">正常</span></td>
+    <td><b>不要管。</b>官方自带 <code>sync_ram.v</code> 的写法瑕疵，行为正确</td></tr>
+<tr><td class="mono">[Vivado 12-13340] Unable to auto find GCC executables from simulator install path! (path not set)</td>
+    <td><span class="tag t-ok">正常</span></td>
+    <td><b>不要管。</b>本设计<strong>不使用 DPI-C</strong>（<code>dpic.v</code> 已删除），gcc 用不到</td></tr>
+<tr><td class="mono">[Simtcl 6-197] One or more HDL objects could not be logged because of object type or size limitations</td>
+    <td><span class="tag t-ok">正常</span></td>
+    <td><b>不要管。</b>256&nbsp;KB 的存储器数组太大，波形记录器跳过它而已</td></tr>
+<tr><td class="mono">[filemgmt 56-3] Default IP Output Path : Could not find the directory '…/loongson.gen/sources_1'</td>
+    <td><span class="tag t-ok">正常</span></td>
+    <td><b>不要管。</b>IP 是 OOC 方式管理的，不走 <code>loongson.gen</code></td></tr>
+<tr><td class="mono">[Vivado 12-4149] The synthesis checkpoint for IP '…/data_ram.xci' is already up-to-date</td>
+    <td><span class="tag t-ok">正常</span></td>
+    <td><b>不要管。</b>复用已有的 IP 综合检查点</td></tr>
+<tr><td class="mono">[ProjectBase 1-489] The host OS only allows 260 characters in a normal path. The project is stored in a path with more than 80 characters…</td>
+    <td><span class="tag t-warn">留意</span></td>
+    <td><b>不是错误，但建议留意。</b>本工程路径长达 117 字符（<code>D:/Courses/…/run_vivado/project</code>），再叠加 <code>sync_ram.v</code> 里 8 级上跳的相对路径，接近 Windows 260 字符上限。目前工作正常，若哪天出现"找不到文件"，用 <code>subst</code> 映射短盘符即可：<br>
+        <code class="mono">subst X: "D:\Courses\Computer_organization_design\Main_project_1.1"</code></td></tr>
+<tr><td class="mono">[USF-XSim-43] Exported '…/xsim/inst_ram.mif'</td>
+    <td><span class="tag t-ok">正常</span></td>
+    <td><b>不要管。</b>但请注意：<strong>仿真实际读的是 <code>func/obj/inst_ram.mif</code></strong>，不是这个导出副本</td></tr>
+</tbody>
+</table>
+
+<div class="warn">
+<b>还有一条容易漏的：</b>这份日志里<strong>从头到尾没有出现过 <code>inst_ram</code> 的 IP 重新生成</strong>。
+如果你是要<strong>出 bit</strong>（而不是只跑仿真），改了 <code>func/obj/inst_ram.coe</code> 之后必须补上：
+<pre>reset_target all [get_ips inst_ram]
+generate_target all [get_ips inst_ram]</pre>
+否则 bit 里固化的仍然是上一套程序 —— 仿真对、上板错，就是这么来的。
+</div>
+
+<h2>8 · 本次实测证据（可复现）</h2>
+
+<h3>8.1 黄金模型生成 <code>golden_trace.txt</code></h3>
+<pre>----[ 759825 ns] Number 8'd29 Functional Test Point PASS!!!
+==============================================================
+gettrace end!
+<span class="g">----Succeed in generating trace file!</span>
+$finish called at time : 760195 ns : gettrace/src/tb_top.v Line 224
+<span class="c">→ golden_trace.txt = 62377 行</span></pre>
+
+<h3>8.2 本 CPU 跑 EXP4（真实 loongson.xpr 行为仿真）</h3>
+<pre>Time resolution is 1 ps
+==============================================================
+Test begin!
+----[  12105 ns] Number 8'd01 Functional Test Point PASS!!!
+----[  36515 ns] Number 8'd02 Functional Test Point PASS!!!
+   …（02→28 中间全部连续，无跳号）…
+----[ 781225 ns] Number 8'd28 Functional Test Point PASS!!!
+----[ 805635 ns] Number 8'd29 Functional Test Point PASS!!!
+==============================================================
+Test end!
+<span class="g">----PASS!!!</span>
+$finish called at time : 806125 ns : testbench/mycpu_tb.v Line 266
+
+<span class="c">→ "Error" 出现次数：0</span>
+<span class="c">→ 完整日志：cdp_ede_local-master/mycpu_env/soc_verify/soc_bram/run_vivado/project/</span>
+<span class="c">             loongson.sim/sim_1/behav/xsim/simulate.log</span></pre>
+
+<div class="ok">
+<b>结论：EXP4 这一章的功能实现是正确的。</b>仿真、黄金 trace 双 PASS，29/29 测试点零错误。<br>
+所以如果平台分数仍然不理想，缺口不在"第 3 章的指令没实现"，而只可能出在：
+<b>① 上板时序</b>（WNS ≥ 0 是否守住）、<b>② 平台评测的性能项</b>、<b>③ 报告/文档项</b>。
+这三项需要分开排查，不能混在一起归因。
+</div>
+
+</div>
+</body>
+</html>

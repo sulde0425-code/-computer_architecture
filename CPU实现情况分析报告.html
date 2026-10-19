@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LoongArch(LA32R) 五级流水 CPU — 实现情况分析报告</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1c1f23; --ink2:#4a5158; --ink3:#767d85;
+    --line:#e3e6ea; --line2:#eef0f3;
+    --blue:#1a6dd4; --blue-bg:#eaf2fd;
+    --green:#1a8a4a; --green-bg:#e8f6ee;
+    --amber:#a86a00; --amber-bg:#fdf3e0;
+    --red:#c0392b; --red-bg:#fdecea;
+    --purple:#6b3fa0; --purple-bg:#f2ebfb;
+    --mono:"Cascadia Mono","JetBrains Mono",Consolas,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.75 -apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 28px 80px}
+  header{border-bottom:3px solid var(--ink);padding-bottom:20px;margin-bottom:32px}
+  h1{font-size:27px;line-height:1.35;margin:0 0 10px;letter-spacing:-.3px}
+  .sub{color:var(--ink3);font-size:13.5px}
+  .sub code{font-family:var(--mono);font-size:12.5px;background:var(--line2);padding:1px 5px;border-radius:4px}
+  h2{font-size:20px;margin:46px 0 14px;padding-left:12px;border-left:5px solid var(--blue);letter-spacing:-.2px}
+  h3{font-size:16.5px;margin:30px 0 10px;color:var(--ink)}
+  h4{font-size:14.5px;margin:22px 0 8px;color:var(--ink2)}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:24px}
+  li{margin:5px 0}
+  code{font-family:var(--mono);font-size:12.8px;background:#f0f2f5;padding:1.5px 5px;border-radius:4px;color:#24292e}
+  pre{background:#fbfcfd;border:1px solid var(--line);border-left:4px solid var(--blue);
+      border-radius:8px;padding:13px 16px;overflow:auto;margin:12px 0}
+  pre code{background:none;padding:0;font-size:12.6px;line-height:1.65;color:#24292e}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.6px;background:var(--panel);
+        border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  th{background:#f0f2f5;text-align:left;padding:9px 12px;font-weight:600;color:var(--ink2);
+     border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:8px 12px;border-bottom:1px solid var(--line2);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#fafbfc}
+  .badge{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:20px;
+         white-space:nowrap;line-height:1.6}
+  .b-ok{background:var(--green-bg);color:var(--green)}
+  .b-warn{background:var(--amber-bg);color:var(--amber)}
+  .b-err{background:var(--red-bg);color:var(--red)}
+  .b-info{background:var(--blue-bg);color:var(--blue)}
+  .b-gray{background:#eef0f3;color:var(--ink3)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:20px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+  .card .n{font-size:28px;font-weight:700;letter-spacing:-1px;line-height:1.15}
+  .card .t{font-size:12.5px;color:var(--ink3);margin-top:4px}
+  .n-g{color:var(--green)} .n-a{color:var(--amber)} .n-r{color:var(--red)} .n-b{color:var(--blue)}
+  .note{background:var(--blue-bg);border:1px solid #cfe0f7;border-radius:8px;padding:12px 16px;margin:16px 0;font-size:13.8px}
+  .danger{background:var(--red-bg);border:1px solid #f5cdc7;border-radius:8px;padding:12px 16px;margin:16px 0;font-size:13.8px}
+  .ok{background:var(--green-bg);border:1px solid #c7e8d5;border-radius:8px;padding:12px 16px;margin:16px 0;font-size:13.8px}
+  .warn{background:var(--amber-bg);border:1px solid #f2dfae;border-radius:8px;padding:12px 16px;margin:16px 0;font-size:13.8px}
+  .note b,.danger b,.ok b,.warn b{color:inherit}
+  .ev{font-family:var(--mono);font-size:12.2px;color:var(--ink3)}
+  .tag{font-family:var(--mono);font-size:11.6px;background:#f0f2f5;border:1px solid var(--line);
+       border-radius:5px;padding:1px 6px;color:var(--ink2);white-space:nowrap}
+  .mono{font-family:var(--mono);font-size:12.6px}
+  hr{border:none;border-top:1px solid var(--line);margin:38px 0}
+  .toc{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 22px;margin:22px 0 6px}
+  .toc ol{margin:6px 0;padding-left:20px}
+  .toc a{color:var(--blue);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);color:var(--ink3);font-size:12.5px}
+  .kw{color:var(--purple)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>LoongArch（LA32R）五级流水 CPU<br>实现情况分析报告</h1>
+  <div class="sub">
+    工程：<code>D:\Courses\Computer_organization_design\Main_project_1.1</code>　·　
+    设计手册：<code>计组课设指导书LA版-2025</code>（主）+ <code>A01/A02/A03/A04</code>（辅）<br>
+    核查范围：<code>mycpu_env/myCPU/</code> 全部 11 个 Verilog 源文件（<code>dpic.v</code> 已删除、<code>divider.v</code> 为第 5 章新增）+ 验证环境 + 9 套参考镜像与黄金 Trace
+  </div>
+</header>
+
+<div class="cards">
+  <div class="card"><div class="n n-g">46</div><div class="t">ID 级已译码指令条数<br><span class="ev">20 基本 + 13 第3章 + 6 第4章 + 7 第5章</span></div></div>
+  <div class="card"><div class="n n-b">5</div><div class="t">流水级（IF/ID/EXE/MEM/WB）<br><span class="ev">握手协议完整</span></div></div>
+  <div class="card"><div class="n n-a">7 / 7</div><div class="t">参考镜像差异测试通过<br><span class="ev">ex1/2/3/4/5/6/7 全部 PASS</span></div></div>
+  <div class="card"><div class="n n-r">4</div><div class="t">已编写但存在缺陷 / 风险<br><span class="ev">D1~D4 已修复，余 4 项</span></div></div>
+  <div class="card"><div class="n n-a">15</div><div class="t">按指导书仍待实现的功能项<br><span class="ev">第 6 章 + 创新</span></div></div>
+</div>
+
+<div class="toc">
+  <b>目录</b>
+  <ol>
+    <li><a href="#s0">结论速览</a></li>
+    <li><a href="#s1">已实现的功能（并附验证状态）</a></li>
+    <li><a href="#s2">已编写但存在缺陷 / 风险的部分</a></li>
+    <li><a href="#s3">按指导书仍待实现的功能</a></li>
+    <li><a href="#s4">下一步计划（含本次已完成的修改与验证结果）</a>
+      <div style="padding-left:14px;font-size:13.2px">
+        <a href="#s-timing">★ 5.4 50MHz 时序修复全过程（69 分真因）</a>
+      </div></li>
+    <li><a href="#s5">附录：本次核查的方法与证据</a></li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s0">一、结论速览</h2>
+
+<table>
+  <thead><tr><th style="width:150px">维度</th><th style="width:110px">状态</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>五级流水骨架</td><td><span class="badge b-ok">已完成</span></td>
+        <td>IF/ID/EXE/MEM/WB 齐全，<code>valid / allowin / ready_go</code> 握手规范，级间总线位宽与打包完全自洽（160/75/70/38 bit）。</td></tr>
+    <tr><td>第 1 章：顶层接口</td><td><span class="badge b-ok">已完成</span></td>
+        <td><code>inst_sram_en</code>/<code>data_sram_en</code> 片选齐备；<code>inst_sram_we</code>/<code>data_sram_we</code> 已改为 4 bit 字节写使能接口。Vivado 工程已接入本 CPU 全部源文件。</td></tr>
+    <tr><td>第 2 章：冲突处理</td><td><span class="badge b-ok">已完成</span></td>
+        <td>数据前递（EXE&gt;MEM&gt;WB 优先级）+ Load-Use 阻塞均已实现；控制相关用 <code>~br_taken</code> 取消错误路径指令。</td></tr>
+    <tr><td>第 3 章：算术逻辑转移类指令</td><td><span class="badge b-ok">已完成并通过仿真</span></td>
+        <td>13 条新指令（slti / sltui / andi / ori / xori / sll.w / srl.w / sra.w / pcaddu12i / blt / bge / bltu / bgeu）已全部译码。<b>修复了 slti/sltui 的操作码错误（0xb/0xc → 0x8/0x9）</b>，并用 <code>ex4_obj</code>（29 个测试点）与 <code>ex5_obj</code>（33 个测试点）跑通差异测试。</td></tr>
+    <tr><td>第 4 章：访存指令</td><td><span class="badge b-ok">已完成并通过仿真</span></td>
+        <td>6 条（st.b / st.h / ld.b / ld.h / ld.bu / ld.hu）已全部译码；新增"字节写使能生成"（EXE）与"字节选取 + 符号/零扩展"（MEM）两个部件。用 <code>ex6_obj</code> 镜像跑通差异测试，<b>39 个测试点全部 PASS</b>。</td></tr>
+    <tr><td>第 5 章：乘除指令</td><td><span class="badge b-ok">已完成并通过仿真</span></td>
+        <td>7 条（mul.w / mulh.w / mulh.wu / div.w / mod.w / div.wu / mod.wu）已全部译码。乘法在 ALU 内用 <code>*</code> 实现（Vivado 映射到 DSP48，单拍出结果）；除法新增自研的 Radix-2 迭代除法器 <code>divider.v</code>（有符号/无符号各一个实例），<code>es_ready_go</code> 已改造为"结果就绪才有效"。用 <code>ex7_obj</code> 跑通差异测试，<b>46 个测试点全部 PASS</b>。</td></tr>
+    <tr><td><b>★ 50MHz 时序收敛</b></td><td><span class="badge b-ok">已达标</span></td>
+        <td><b>这是"实验评分卡在 69 分"的真正原因。</b>实现后时序报告：<code>cpu_clk_clk_pll</code>
+        <b>WNS = +0.782ns、TNS = 0、违例端点 0 / 10442</b>，保持时间 0 违例，
+        <code>TIMING-16</code> 大违例告警由 <b>274 条降为 0 条</b>。修复过程中连续定位并消除了
+        两条跨级长路径（乘法器 → 分支前递），共四轮迭代，详见 <b>5.4 节</b>。</td></tr>
+    <tr><td>第 6 章：异常与中断</td><td><span class="badge b-err">未实现</span></td>
+        <td>无 CSR 模块、无 csrrd/csrwr/csrxchg/ertn/syscall/rdcnt* 指令、无 ADEF/ALE/INE/BRK/SYS 判定、无精确异常冲刷逻辑。</td></tr>
+    <tr><td>创新扩展（团队 40 分）</td><td><span class="badge b-gray">未开始</span></td>
+        <td>AXI 总线接口、Cache、外设操控三类选项均未见代码。</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <b>一句话总结（已更新）：</b>这是一个 <b>结构完整、风格规范的五级流水 CPU</b>。<b>第 1～5 章已全部实现并逐章通过差异测试</b>：第 1、2 章骨架与冲突处理；第 3 章修复了 <code>slti/sltui</code> 操作码错误（ex4/ex5 通过）；第 4 章补齐字节写使能、字节选取与符号/零扩展（ex6 通过）；<b>第 5 章新增自研迭代除法器 <code>divider.v</code> 并把 <code>es_ready_go</code> 改成条件信号（ex7 通过，46/46 测试点）</b>。ex1～ex7 七套镜像回归零退化。目前只剩<b>第 6 章（异常与中断，即团队 40 分部分）</b>与创新扩展未动工。
+</div>
+
+<div class="warn">
+  <b>★ 关于"实验评分卡在 69 分"（本轮定位并已修复）</b><br>
+  先前的结论是"功能覆盖不足"，<b>这个结论是错的</b>。9 条目标指令
+  （slti / sltui / andi / ori / xori / sll.w / srl.w / sra.w / pcaddu12i）在本设计中
+  <b>全部已正确译码</b>，本地 <code>ex4_obj</code> 差异测试 <b>29/29 全 PASS</b>，
+  功能层面无丢分。<br>
+  真实原因是：<b>校内赛平台是"上传 bit → 远程 FPGA → 自动评测"，而本设计在 50MHz 下时序不收敛</b>。
+  原始实现后报告为 <code>WNS=-2.090ns / TNS=-857.955ns / 违例端点 1356 个</code>、
+  <code>TIMING-16 Large setup violation: 274</code> ——
+  这样的 bit 上板必然算错，于是<b>每一章都在丢分</b>，而不是第 3 章单独丢分。<br>
+  经四轮修复，现已收敛到 <b>WNS=+0.782ns、0 违例</b>，且七套镜像功能回归全绿。
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s1">二、已实现的功能（并附验证状态）</h2>
+
+<h3>2.1 五级流水线框架</h3>
+<p>五个流水级均已按指导书第一章的模板搭建，握手信号命名与语义完全一致：</p>
+
+<table>
+  <thead><tr><th style="width:78px">流水级</th><th style="width:200px">文件</th><th>关键实现</th></tr></thead>
+  <tbody>
+    <tr><td>IF</td><td class="mono">IF_stage.v</td>
+        <td>PC 初值 <code>0x1bfffffc</code> → 首条取 <code>0x1c000000</code>；<code>seq_pc = fs_pc+4</code>；<code>next_pc = br_taken ? br_target : seq_pc</code>；同步读指令 RAM。</td></tr>
+    <tr><td>ID</td><td class="mono">ID_stage.v</td>
+        <td>one-hot 译码（4 个解码器）、立即数选择、寄存器堆实例化、前递选择、Load-Use 阻塞、分支判定，并额外生成访存宽度 <code>ds_mem_size</code> 与扩展标志 <code>ds_ld_signed</code>。</td></tr>
+    <tr><td>EXE</td><td class="mono">EXE_stage.v</td>
+        <td>例化 <code>ALU</code>（12 位 one-hot 操作码）；按 <code>alu_result[1:0]</code> 生成字节/半字写使能与对齐写数据；输出前递信息。</td></tr>
+    <tr><td>MEM</td><td class="mono">MEM_stage.v</td>
+        <td>按 <code>ms_alu_result[1:0]</code> 从 <code>data_sram_rdata</code> 中选出字节/半字，按 <code>ld_signed</code> 做符号或零扩展后与 <code>alu_result</code> 汇总为最终写回值。</td></tr>
+    <tr><td>WB</td><td class="mono">WB_stage.v</td>
+        <td>写回寄存器堆，并用 <code>ws_valid &amp;&amp; ws_reg_write_en &amp;&amp; ws_rd!=0</code> 三重保护避免误写 x0；同时驱动 <code>debug_wb_*</code> 比对接口。</td></tr>
+  </tbody>
+</table>
+
+<p>级间总线位宽在 <code>mycpu_h.v</code> 中统一定义，并与各级的打包顺序<b>逐位核对无误</b>：</p>
+<pre><code>`define BR_BUS_WD         33   // {br_taken(1), br_target(32)}
+`define FS_TO_DS_BUS_WD   64   // {fs_inst(32), fs_pc(32)}
+`define DS_TO_ES_BUS_WD  160   // {spare(1), alu_op(16), div_en(1), div_signed(1), div_rem(1), res_from_mem(1), alu_src1(32), alu_src2(32), gr_we(1), mem_we(1), mem_size(3), ld_signed(1), dest(5), rkd_value(32), ds_pc(32)}
+`define ES_TO_MS_BUS_WD   75   // {res_from_mem(1), gr_we(1), mem_size(3), ld_signed(1), dest(5), alu_result(32), pc(32)}
+`define MS_TO_WS_BUS_WD   70   // {gr_we(1), dest(5), final_result(32), pc(32)}
+`define WS_TO_RF_BUS_WD   38   // {rf_we(1), rf_waddr(5), rf_wdata(32)}</code></pre>
+
+<h3>2.2 已译码的 46 条指令</h3>
+<p>ID 级用 <code>op[31:26] / op[25:22] / op[21:20] / op[19:15]</code> 四级 one-hot 做译码，ALU 采用 16 位 one-hot 操作码（<code>[11:0]</code> 沿用原 12 个，<code>[14:12]</code> 为第 5 章三条乘法）。逐条核对编码与数据通路，<b>逻辑均正确</b>。</p>
+
+<h4>（a）20 条基本指令 —— <span class="badge b-ok">已被当前镜像实测通过</span></h4>
+<table>
+  <thead><tr><th style="width:170px">指令</th><th style="width:150px">译码依据 (ID_stage.v)</th><th>实现要点 / 核对结论</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">lu12i.w</td><td class="mono">L194&nbsp;&nbsp;op=0x05&amp;~[25]</td><td><code>alu_op[11]=lui</code>，ALU 直通 src2；<code>need_si20</code> ⇒ <code>{i20,12'b0}</code>。rd = si20&lt;&lt;12 ✔</td></tr>
+    <tr><td class="mono">add.w / sub.w</td><td class="mono">L175 / L176</td><td>共用加法器，<code>alu_op[0]/[1]</code>；sub 用 <code>~src2</code> 且 cin=1 ✔</td></tr>
+    <tr><td class="mono">slt / sltu</td><td class="mono">L177 / L178</td><td>借用同一加法器：<code>slt_res = ovf ^ res[31]</code>，<code>sltu_res = ~adder_res[32]</code> ✔</td></tr>
+    <tr><td class="mono">and/or/xor/nor</td><td class="mono">L179–L182</td><td><code>alu_op[4]/[6]/[7]/[5]</code>，nor 取 <code>~(a|b)</code> ✔</td></tr>
+    <tr><td class="mono">slli.w / srli.w / srai.w</td><td class="mono">L183–L185</td><td><code>need_ui5</code> ⇒ 移位量取 <code>rk[4:0]</code>（即位 14:10）；sra 用 <code>$signed&gt;&gt;&gt;</code> ✔</td></tr>
+    <tr><td class="mono">addi.w</td><td class="mono">L186&nbsp;&nbsp;op25_22=0xa</td><td>si12 符号扩展（默认分支）✔</td></tr>
+    <tr><td class="mono">ld.w / st.w</td><td class="mono">L187 / L188</td><td><code>op=0x0a</code> 配 <code>[25:22]=2/6</code>；地址 = rj + si12；<code>res_from_mem</code>/<code>mem_we</code> 正确 ✔</td></tr>
+    <tr><td class="mono">jirl</td><td class="mono">L189&nbsp;&nbsp;op=0x13</td><td><b>要点核对：</b>跳转目标 = <code>rj_value + (si16&lt;&lt;2)</code>（<code>br_target</code> 的 jirl 分支），链接值 = <code>ds_pc+4</code>（ALU 走 <code>src1_is_pc</code> + <code>src2_is_4</code>）✔ 二者未张冠李戴</td></tr>
+    <tr><td class="mono">b / bl</td><td class="mono">L190 / L191</td><td>26 位偏移 &lt;&lt;2 加到 <code>ds_pc</code>；bl 另写 r1（<code>dst_is_r1</code>）✔</td></tr>
+    <tr><td class="mono">beq / bne</td><td class="mono">L192 / L193</td><td>16 位偏移；比较源为 rj / rd（<code>src_reg_is_rd</code>）✔</td></tr>
+  </tbody>
+</table>
+
+<h4>（b）13 条第 3 章指令 —— <span class="badge b-ok">已修复并跑通 ex4/ex5 差异测试</span></h4>
+<table>
+  <thead><tr><th style="width:190px">指令</th><th style="width:150px">译码依据</th><th>实现要点 / 核对结论</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">slti / sltui</td><td class="mono">L200 / L201</td><td><span class="badge b-err">原为致命 BUG</span> 原写作 <code>op25_22=0xb/0xc</code>，而 LA32R 规范是 <b>0x8 / 0x9</b>（已据 A01 手册附录编码表核实）。原写法导致两条指令无法被译码、且 <code>0xb/0xc</code> 是未被占用的操作码。已修正为 <code>4'h8 / 4'h9</code>；src2 走 si12 符号扩展，复用 slt/sltu 结果 ✔</td></tr>
+    <tr><td class="mono">andi / ori / xori</td><td class="mono">L197–L199</td><td><code>need_ui12</code> ⇒ <code>{20'b0, i12}</code> <b>零扩展</b>（符合 12 位无符号立即数语义）✔</td></tr>
+    <tr><td class="mono">sll.w / srl.w / sra.w</td><td class="mono">L201–L203</td><td>3R 形式，移位量取 <code>src2[4:0]</code>，与立即数移位共用 ALU 通路 ✔</td></tr>
+    <tr><td class="mono">pcaddu12i</td><td class="mono">L200&nbsp;&nbsp;op=0x07</td><td><code>src1_is_pc</code> ⇒ src1 = <code>ds_pc</code>；<code>need_si20</code> ⇒ si20&lt;&lt;12 ✔</td></tr>
+    <tr><td class="mono">blt / bge / bltu / bgeu</td><td class="mono">L204–L207</td><td><code>op=0x18–0x1b</code>；比较用 <code>$signed</code> / 无符号两套比较器；偏移 si16 ✔</td></tr>
+  </tbody>
+</table>
+
+<div class="ok">
+  <b>值得肯定的两条：</b><br>
+  ① <code>blt/bge/bltu/bgeu</code> 同时补进了 <code>gr_we</code>、<code>src_reg_is_rd</code>、<code>ds_use_rj</code>、<code>ds_use_rkd</code>、<code>need_si16</code> 与 <code>br_taken</code> 六处——没有漏改，这一点很容易出错。本次实测 ex5_obj 33 个测试点全部通过，证明这 4 条转移指令实现正确。<br>
+  ② <code>jirl</code> 的"跳转目标用 rj、链接值用 PC+4"这一对最容易混淆的语义写对了。
+</div>
+
+<div class="ok">
+  <b>本次修复（已验证）：</b><br>
+  • <code>inst_slti</code> / <code>inst_sltui</code> 操作码 <code>0xb/0xc → 0x8/0x9</code>。对照实验显示：改回原写法时，仿真在<b>第 22 个测试点（PC=0x1c03b308）即失配</b>；改回正确写法后 29 个测试点全部通过。<br>
+  • <code>gr_we</code> 由"反向屏蔽"改为"正向或"（见 D1）。<br>
+  • <code>need_si12</code> / <code>need_si16</code> 由只赋值不读取的死信号，改为真正参与立即数与分支偏移选择；未译码指令的立即数兜底为 0。<br>
+  • <code>load_stall</code> 的 <code>wire</code> 声明从第 332 行提到第 37 行——原写法"先用后声明"，Vivado <code>xvlog</code> 会直接报 <code>VRFC 10-3380</code> 编译错误。
+</div>
+
+<h4>（c）6 条第 4 章访存指令 —— <span class="badge b-ok">已完成，ex6 镜像 39/39 PASS</span></h4>
+<p>6 条指令全部落在 <code>op[31:26]=001010</code> 段，用 <code>op[25:22]</code> 区分；均为 <code>rd, rj, si12</code> 格式，地址计算与立即数选择完全复用 <code>ld.w / st.w</code> 的现成通路。</p>
+<table>
+  <thead><tr><th style="width:150px">指令</th><th style="width:150px">编码 (op[25:22])</th><th>实现要点</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">ld.b</td><td class="mono">0000</td><td rowspan="4">与 <code>ld.w</code> 共用地址计算、读 RAM 时序与写回通路，差异仅在 MEM 级的<b>字节/半字选取</b>与<b>扩展方式</b>（由 <code>mem_size</code> + <code>ld_signed</code> 控制）。</td></tr>
+    <tr><td class="mono">ld.h</td><td class="mono">0001</td></tr>
+    <tr><td class="mono">ld.bu</td><td class="mono">1000</td></tr>
+    <tr><td class="mono">ld.hu</td><td class="mono">1001</td></tr>
+    <tr><td class="mono">st.b</td><td class="mono">0100</td><td rowspan="2">与 <code>st.w</code> 共用地址计算；写数据源同为 <code>rd</code>（<code>src_reg_is_rd=1</code>），差异仅在 EXE 级的<b>写使能生成</b>与<b>写数据对齐</b>。</td></tr>
+    <tr><td class="mono">st.h</td><td class="mono">0101</td></tr>
+  </tbody>
+</table>
+
+<div class="ok">
+  <b>本次新增的两个关键部件（第 4 章）：</b><br><br>
+  <b>① EXE 级 —— 字节写使能与写数据对齐</b>（<code>EXE_stage.v</code>）：<br>
+  <pre><code>wire [1:0] es_addr_low   = alu_result[1:0];                     // 小端：字内字节偏移
+wire [3:0] we_byte       = 4'b0001 &lt;&lt; es_addr_low;               // st.b
+wire [3:0] we_half       = es_addr_low[1] ? 4'b1100 : 4'b0011;   // st.h
+wire [31:0] wdata_byte   = {4{es_rkd_value[7:0]}};               // 字节复制 4 份
+wire [31:0] wdata_half   = {2{es_rkd_value[15:0]}};              // 半字复制 2 份</code></pre>
+  写数据采用"<b>复制到所有通道 + 写使能单选</b>"的方式生成，避免额外的桶形移位器，面积与时序都更省。<br><br>
+  <b>② MEM 级 —— 字节/半字选取 + 符号/零扩展</b>（<code>MEM_stage.v</code>）：<br>
+  <pre><code>wire [7:0] ld_byte = (ms_addr_low==2'b00) ? rdata[ 7: 0] :
+                     (ms_addr_low==2'b01) ? rdata[15: 8] :
+                     (ms_addr_low==2'b10) ? rdata[23:16] : rdata[31:24];
+wire [15:0] ld_half = ms_addr_low[1] ? rdata[31:16] : rdata[15: 0];
+// ld.b / ld.h 符号扩展，ld.bu / ld.hu 零扩展</code></pre>
+  <b>③ 总线扩宽</b>：<code>DS_TO_ES_BUS_WD 148→152</code>（新增 <code>mem_size(3) + ld_signed(1)</code>），<code>ES_TO_MS_BUS_WD 71→75</code>。<code>MS_TO_WS</code> 不变——因为扩展在 MEM 级完成，写回级拿到的已经是 32 位正确值。<br>
+  <b>④ 顺带发现并修掉一个连带问题</b>：<code>res_from_mem</code>、<code>gr_we</code>、<code>mem_we</code>、<code>src_reg_is_rd</code>、<code>ds_use_rj</code>、<code>ds_use_rkd</code>、<code>need_si12</code>、<code>src2_is_imm</code>、<code>alu_op[0]</code> 共 9 处控制信号原先只覆盖 <code>ld.w/st.w</code>，现已统一改用汇总信号 <code>inst_ld_all / inst_st_all</code>，避免"漏改一处导致某条新指令悄悄走错通路"。<br>
+  <b>⑤ 上板可用性已确认</b>：数据 RAM 的 Xilinx IP 配置为 <code>Use_Byte_Write_Enable=true</code>、<code>wea[3:0]</code>，与仿真用 <code>sync_ram.v</code> 的 <code>we[i]</code> 逐字节写语义一致，<b>不会出现"仿真过、上板挂"</b>。
+</div>
+
+<h4>（d）7 条第 5 章乘除指令 —— <span class="badge b-ok">已完成，ex7 镜像 46/46 PASS</span></h4>
+<p>7 条指令全部落在 <code>op[31:26]=000000 &amp; op[25:22]=0000</code> 段，用 <code>op[21:20]</code> 区分乘法（<code>01</code>）与除法（<code>10</code>），再用 <code>op[19:15]</code> 细分。均为 <code>rd, rj, rk</code> 三寄存器格式，两个源都走寄存器堆 → 前递网络可完整复用。</p>
+<table>
+  <thead><tr><th style="width:150px">指令</th><th style="width:130px">编码 [21:20]/[19:15]</th><th>实现要点</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">mul.w</td><td class="mono">01 / 11000 (0x18)</td><td rowspan="3">用 Verilog <code>*</code> 实现（Artix-7 上 Vivado 映射到 DSP48，<b>单拍出结果</b>，不占 LUT）。<br>三者共用一个 64 位乘积：<code>mul.w</code> 取 <code>[31:0]</code>（有符号/无符号低 32 位相同，故复用无符号乘积即可）；<code>mulh.w</code> 取<b>有符号</b>乘积 <code>[63:32]</code>；<code>mulh.wu</code> 取<b>无符号</b>乘积 <code>[63:32]</code>。<br><br><b>⚠ 时序修复后位置有变更：</b>乘法器<b>已从 <code>alu.v</code> 移到 <code>EXE_stage.v</code> 单独实现</b>。原因是乘法器在 Artix-7 上是 <b>DSP48 级联 + CARRY4×12 的 64 位积加法</b>，组合延迟极大（实测 22ns）；把它并进 <code>alu.v</code> 的结果"或树"后，<code>alu_result</code> 作为所有指令的前递数据源，乘法器就永远留在前递逻辑锥里，而 <code>op_mul</code> 是<b>运行期信号</b>（非常量），综合器无法据此把它剪除，反而会把它<b>复制进 ID 级</b>，时序彻底崩溃（WNS -3.08ns）。移出后乘法结果只送 <code>es_to_ms_bus</code>，<b>不进入前递路径</b>，改由 MEM 级前递（配合 ID 级 <code>mul_stall</code>）。详见 <b>5.4 节</b>。</td></tr>
+    <tr><td class="mono">mulh.w</td><td class="mono">01 / 11001 (0x19)</td></tr>
+    <tr><td class="mono">mulh.wu</td><td class="mono">01 / 11010 (0x1a)</td></tr>
+    <tr><td class="mono">div.w</td><td class="mono">10 / 00000 (0x00)</td><td rowspan="4">由 EXE 级例化的 <code>divider.v</code> 多拍完成：<code>[21:20]=10</code> 的四条分别驱动有符号（<code>div_signed=1</code>）或无语符号除法器，再由 <code>div_rem</code> 决定从结果的高 32 位（商）还是低 32 位（余数）取值。</td></tr>
+    <tr><td class="mono">mod.w</td><td class="mono">10 / 00001 (0x01)</td></tr>
+    <tr><td class="mono">div.wu</td><td class="mono">10 / 00010 (0x02)</td></tr>
+    <tr><td class="mono">mod.wu</td><td class="mono">10 / 00011 (0x03)</td></tr>
+  </tbody>
+</table>
+
+<div class="ok">
+  <b>本次新增的三个部件（第 5 章）：</b><br><br>
+  <b>① 自研 Radix-2 迭代除法器</b>（新文件 <code>myCPU/divider.v</code>，146 行）<br>
+  指导书 §5.1 推荐调用 Xilinx Divider Generator IP，§5.2 也允许自行实现电路级除法器。本设计选择了后者，好处是<b>不依赖任何 IP，仿真与上板都能直接跑，也不会因为 IP 未生成而导致综合失败</b>。<br>
+  接口刻意做成与 Divider Generator 的 AXI-Stream <b>完全同名同语义</b>，因此日后若想换成 IP，只需用 IP Catalog 生成一个端口一致的除法器直接替换例化即可，EXE 级无需改动：
+  <pre><code>divider #(.SIGNED(1)) u_divider_signed   // div.w / mod.w
+divider #(.SIGNED(0)) u_divider_unsigned // div.wu / mod.wu
+// s_axis_dividend_tvalid/tready/tdata[31:0]
+// s_axis_divisor_tvalid /tready/tdata[31:0]
+// m_axis_dout_tvalid, m_axis_dout_tdata[63:32]=商, [31:0]=余数</code></pre>
+  算法为恢复余数法，每拍迭代 1 位、共 32 拍出结果；有符号除先取绝对值再按"商符号 = 被除数符号 ^ 除数符号、余数符号 = 被除数符号"还原，与 LA32R 规定的"<b>商向零取整、余数与被除数同号</b>"完全一致。<br>
+  <b>算法已用 Python 逐位复现并双重验证</b>：与 <code>func/inst/n30~n36</code> 里的 <b>1060 条真实测试向量逐条对拍，零失配</b>；再与 C 语义参考模型做 <b>2 万组随机交叉验证，零失配</b>。<br><br>
+  <b>② EXE 级除法握手与 <code>ready_go</code> 改造</b>（<code>EXE_stage.v</code>）<br>
+  严格落实了指导书特别强调的两点：
+  <pre><code>wire div_req = es_div_inst &amp;&amp; !div_sent &amp;&amp; !div_done;
+assign s_axis_dividend_tvalid = div_req &amp;  es_div_signed;  // 除法指令进 EXE 即置起
+// 一旦某拍同时看到 tvalid/tready（握手成功），立即置 div_sent，下一拍撤销 tvalid
+if (div_handshake) div_sent &lt;= 1'b1;
+
+// 核心：除法未完成时本级 ready_go 不成立，流水线在此等待
+assign es_ready_go = !es_div_inst || es_div_ready;   // es_div_ready = div_done | div_dout_valid</code></pre>
+  同时把结果<b>锁存</b>到 <code>div_result_r</code>，避免下层反压时丢失；<code>es_to_ms_bus</code> 里送出的已是最终值，因此 <code>ES_TO_MS / MS_TO_WS</code> 位宽<b>不需要变</b>。<br><br>
+  <b>③ 除法相关 RAW 冲突处理</b>（<code>ID_stage.v</code>）<br>
+  除法要占 EXE 几十拍，期间若后继指令要用它的结果，绝不能前递未算完的值。新增了与 Load-Use 完全同构的阻塞：
+  <pre><code>assign div_stall = es_is_div &amp;&amp; !es_div_ready &amp;&amp; (
+    (ds_use_rj  &amp;&amp; (rf_raddr1 != 5'd0) &amp;&amp; (rf_raddr1 == es_forward_dest)) ||
+    (ds_use_rkd &amp;&amp; (rf_raddr2 != 5'd0) &amp;&amp; (rf_raddr2 == es_forward_dest)));
+assign ds_ready_go = ~load_stall &amp; ~div_stall;</code></pre>
+  并且 <code>es_forward_valid</code> 对除法加了 <code>&amp;&amp; es_div_ready</code> 的门控，双重保险。<br><br>
+  <b>④ 总线扩宽</b>：<code>DS_TO_ES_BUS_WD 152→160</code>（<code>alu_op 12→16</code> 位、新增 <code>div_en/div_signed/div_rem</code> 共 3 位、以及 1 位保留位供第 6 章异常信息使用）。<code>ES_TO_MS 75</code> 与 <code>MS_TO_WS 70</code> 均不变。<br><br>
+  <b>⑤ 已加入 Vivado 工程</b>：<code>divider.v</code> 已写入 <code>loongson.xpr</code> 的源文件列表（synthesis / implementation / simulation 三项均启用），综合时会被自动读入。<br>
+  <b>⑥ 综合前 elaboration 已验证</b>：对改造后的 RTL 单独跑了一次 <code>synth_design -rtl</code>，结果 <b>零 ERROR、零 Critical Warning</b>，只有 3 条无害提示（保留位 <code>alu_op[15]</code> 无负载、以及既有的 <code>io_a0_val</code> 未连接）。<b>不存在组合逻辑环。</b>
+</div>
+
+<h3>2.3 流水线冲突处理（第 2 章）</h3>
+
+<h4>数据前递（forwarding / bypass）</h4>
+<p>三级前递全部接回 ID 级，优先级严格 <b>EXE &gt; MEM &gt; WB &gt; 寄存器堆</b>，与指导书 §2.4.1 一致：</p>
+<pre><code>wire [31:0] rj_forward_data =
+    (es_forward_valid &amp;&amp; ds_use_rj  &amp;&amp; (es_forward_dest == rf_raddr1)) ? es_forward_data :
+    (ms_forward_valid &amp;&amp; ds_use_rj  &amp;&amp; (ms_forward_dest == rf_raddr1)) ? ms_forward_data :
+    (ws_forward_valid &amp;&amp; ds_use_rj  &amp;&amp; (ws_forward_dest == rf_raddr1)) ? ws_forward_data :
+                                                                        rf_rdata1;</code></pre>
+<p>并且用 <code>ds_use_rj</code> / <code>ds_use_rkd</code> 精确限定了"本指令是否真的把该寄存器当源操作数"——例如 <code>slli.w</code> 的第二源是立即数，就不参与 rkd 前递；<code>addi.w</code>/<code>ld.w</code> 也只参与 rj 前递。<b>判断正确，未出现"多前递"导致的假相关</b>。</p>
+<p>MEM 级前递数据取自 <code>ms_final_result</code>，对 load 而言正好是 <code>data_sram_rdata</code>，因此 Load 结果能通过 MEM 前递被上一级消费，与 Load-Use 阻塞配合构成完整的 load 通路。</p>
+
+<h4>Load-Use 阻塞</h4>
+<pre><code>assign ds_ready_go = ~load_stall;
+wire load_stall = es_is_load &amp;&amp; (
+    (ds_use_rj  &amp;&amp; (rf_raddr1 != 5'd0) &amp;&amp; (rf_raddr1 == es_forward_dest)) ||
+    (ds_use_rkd &amp;&amp; (rf_raddr2 != 5'd0) &amp;&amp; (rf_raddr2 == es_forward_dest))
+);</code></pre>
+<p>阻塞条件覆盖了 x0 特例；<code>ds_allowin</code>/<code>ds_to_es_valid</code> 随 <code>ds_ready_go</code> 一起联动，阻塞时 EXE 收到气泡。逻辑闭环，符合指导书 §2.4.2。</p>
+
+<h3>2.4 控制相关与错误路径指令取消</h3>
+<p>这是本设计中<b>唯一一处主动偏离指导书第一章模板</b>的地方，但方向是<b>正确的</b>：</p>
+<pre><code>// 指导书第一章模板 (page 5)：
+assign fs_to_ds_valid = fs_valid &amp;&amp; fs_ready_go;
+
+// 本设计 (IF_stage.v:47)：
+// 分支/跳转被采取时，IF 级中已预取的那条错误路径指令必须被取消(flush)。
+assign fs_to_ds_valid = fs_valid &amp;&amp; fs_ready_go &amp;&amp; ~br_taken;</code></pre>
+<p>指导书第一章给的模板是"尚未引入转移指令"的简化版；其第二章 §2.3「控制相关的冲突」明确要求：<i>"…无法改变存在于 0x1004 的指令存在流水线的事实，他是不可能被执行的…取消一条指令，就是把伴随这个指令的 valid 变为 0"</i>。本设计的 <code>~br_taken</code> 门控正是这一要求的实现，且不破坏 IF 的 valid 状态机（下一拍 <code>fs_pc</code> 会装载 <code>br_target</code>，与 <code>inst_sram_addr = next_pc</code> 自洽）。<br>
+<b>结论：逻辑正确。但当前测试镜像覆盖不到它</b>——详见缺陷 D6。</p>
+
+<h3>2.5 第 1 章顶层接口要求</h3>
+<table>
+  <thead><tr><th style="width:230px">指导书要求</th><th style="width:100px">状态</th><th>证据</th></tr></thead>
+  <tbody>
+    <tr><td>增加指令 RAM 片选 <code>inst_sram_en</code></td><td><span class="badge b-ok">✔</span></td><td class="mono">mycpu_head.v:8, IF_stage.v:64</td></tr>
+    <tr><td>增加数据 RAM 片选 <code>data_sram_en</code></td><td><span class="badge b-ok">✔</span></td><td class="mono">mycpu_head.v:15, EXE_stage.v:93</td></tr>
+    <tr><td><code>inst_sram_we</code> 改为 4 bit 字节写使能</td><td><span class="badge b-ok">✔</span></td><td class="mono">mycpu_head.v:9 <code>[3:0]</code></td></tr>
+    <tr><td><code>data_sram_we</code> 改为 4 bit 字节写使能</td><td><span class="badge b-ok">✔</span></td><td>位宽 <code>[3:0]</code>，并按 <code>alu_result[1:0]</code> 生成 st.b/st.h 的字节使能（见 2.2 节）</td></tr>
+    <tr><td>接入 soc_bram 模板工程</td><td><span class="badge b-ok">✔</span></td><td class="mono">loongson.xpr 已引用 myCPU/*.v 共 10 个文件</td></tr>
+  </tbody>
+</table>
+
+<h3>2.6 验证环境</h3>
+<ul>
+  <li><code>soc_verify/soc_bram/testbench/mycpu_tb.v</code>：上升沿取参考、下降沿比对 <code>debug_wb_pc / wnum / wdata</code>，<code>END_PC = 0x1c000100</code>，并统计 CONFREG 功能测试点 PASS/FAIL。</li>
+  <li><code>WB_stage.v</code> 的 <code>debug_wb_rf_wen = {4{rf_we}}</code> 与 tb 的 4 位字节掩码语义匹配。</li>
+  <li><code>sync_ram.v</code> 的 <code>we[i]</code> 逐字节写逻辑支持 st.b/st.h——<b>CPU 侧的字节使能已生成，二者已打通</b>。</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="s2">三、已编写但存在缺陷 / 风险的部分</h2>
+
+<div class="note">
+  <b>状态更新：</b>D1（未译码指令误写寄存器堆）、D2（字节写使能）、D3（字节选取与扩展）、D4（<code>es_ready_go</code> 硬置 1）<b>均已修复</b>——D2/D3 即第 4 章的两个关键部件，D4 为第 5 章除法铺路。<b>D9（<code>br_taken</code> 组合路径偏长）也已实测定位并修复</b>（50MHz 时序已收敛：WNS +0.782ns / 0 违例）。<b>剩余 D5（无异常/CSR，阻塞第 6 章）、D6（<code>~br_taken</code> 的验证覆盖不足）、D8（<code>io_a0_val</code> 悬空）共 3 项。</b>
+</div>
+
+<h3>D1 <span class="badge b-ok">已修复</span> 未译码指令的 <code>gr_we</code> 默认拉高 —— 会静默写寄存器</h3>
+<p><span class="ev">位置：ID_stage.v（原 L260–261）</span></p>
+<pre><code>// 修改前（反向屏蔽，危险）
+assign gr_we = ~inst_st_w &amp; ~inst_beq &amp; ~inst_bne &amp; ~inst_b &amp;
+               ~inst_blt  &amp; ~inst_bge &amp; ~inst_bltu &amp; ~inst_bgeu;</code></pre>
+<p>这是"<b>反向屏蔽</b>"写法：只排除掉"不写寄存器"的指令，其余一律 <code>gr_we=1</code>。于是任何<b>未被译码</b>的指令（所有 <code>inst_*</code> 全为 0）都会走进"默认通路"：</p>
+<ul>
+  <li><code>alu_op = 12'b0</code> ⇒ ALU 执行 <code>alu_op[0]=add</code>；</li>
+  <li><code>src2_is_imm = 0</code> ⇒ src2 = rkd_value；</li>
+  <li>净效果：<b>rd ← rj + rk</b>，并且真的写回寄存器堆。</li>
+</ul>
+<p><b>触发条件（换第 4 章 func 就会命中）：</b>镜像里只要出现 <code>ld.b / ld.h / ld.bu / ld.hu / st.b / st.h</code> 或 <code>mul.w / div.w</code> 或 <code>csrrd / syscall</code>，就会命中。以 <code>ld.b r4, r5, 0</code>（<code>0x28000000</code>）为例：<code>op=0x0a</code> 但 <code>[25:22]=0</code>，既不是 <code>ld.w</code>(2) 也不是 <code>st.w</code>(6)，故全部 <code>inst_*</code> 为 0 ⇒ 写 <code>r4 = r5 + r10</code>。</p>
+<p><b>已按"正向或"写法修复：</b></p>
+<pre><code>assign gr_we = inst_add_w  | inst_sub_w  | inst_slt   | inst_sltu  |
+               inst_nor    | inst_and    | inst_or    | inst_xor   |
+               inst_slli_w | inst_srli_w | inst_srai_w|
+               inst_addi_w | inst_ld_all | inst_lu12i_w |
+               inst_slti   | inst_sltui  | inst_andi  | inst_ori   | inst_xori |
+               inst_pcaddu12i | inst_sll_w | inst_srl_w | inst_sra_w |
+               inst_jirl   | inst_bl;
+// 后续可复用：wire inst_ine = ~gr_we_any_decoded;  // 第 6 章 INE 异常判定</code></pre>
+<p>这样既消除误写，又顺便得到第 6 章"指令不存在异常 INE"所需的判定信号。第 4 章加入 6 条访存指令后，此处改用汇总信号 <code>inst_ld_all</code>，避免继续逐个罗列。</p>
+
+<h3>D2 <span class="badge b-ok">已修复</span> <code>data_sram_we</code> 原硬编码 <code>4'b1111</code>，无字节写使能生成</h3>
+<p><span class="ev">位置：EXE_stage.v（原 L93–96）</span></p>
+<pre><code>// 修改前：恒全字写入，st.b/st.h 会写坏整字
+assign data_sram_we    = (es_valid &amp;&amp; es_mem_we) ? 4'b1111 : 4'b0000;
+assign data_sram_wdata = es_rkd_value;
+
+// 修改后：按 vaddr[1:0] 生成字节/半字使能，写数据复制到各字节通道
+wire [3:0] we_byte = 4'b0001 &lt;&lt; es_addr_low;                 // st.b: 00→0001 … 11→1000
+wire [3:0] we_half = es_addr_low[1] ? 4'b1100 : 4'b0011;     // st.h: 00→0011  10→1100
+assign data_sram_we = (es_valid &amp;&amp; es_mem_we) ? es_store_we : 4'b0000;</code></pre>
+<p>与指导书 §4.1 的写使能表完全一致。数据 RAM 的 IP（<code>Use_Byte_Write_Enable=true</code>、<code>wea[3:0]</code>）与仿真用 <code>sync_ram.v</code> 均支持逐字节写。</p>
+
+<h3>D3 <span class="badge b-ok">已修复</span> MEM 级写回值原缺少"字节选取 + 符号/零扩展"</h3>
+<p><span class="ev">位置：MEM_stage.v（原 L70）</span></p>
+<pre><code>// 修改前：只能整字写回，ld.b/ld.h/ld.bu/ld.hu 无法实现
+assign ms_final_result = ms_res_from_mem ? data_sram_rdata : ms_alu_result;
+
+// 修改后：按地址低两位选字节/半字，再按 ld_signed 决定符号扩展或零扩展
+wire [7:0]  ld_byte = (ms_addr_low==2'b00) ? rdata[7:0] : ... ;
+wire [15:0] ld_half = ms_addr_low[1] ? rdata[31:16] : rdata[15:0];
+wire [31:0] ms_final_result = ms_res_from_mem ? mem_load_data : ms_alu_result;</code></pre>
+<p>扩展在 MEM 级即完成，因此 <code>ms_final_result</code>（同时是 MEM 前递数据源）携带的就是<b>已扩展的 32 位正确值</b>，前递通路无需再改。</p>
+
+<h3>D4 <span class="badge b-ok">已修复（第 5 章）</span> 三级 <code>ready_go</code> 全部硬置 1，流水线无法等待多拍</h3>
+<p><span class="ev">原位置：EXE_stage.v:35、MEM_stage.v:31、WB_stage.v:34</span></p>
+<pre><code>assign es_ready_go = 1'b1;   // 原 EXE（改造前）
+assign ms_ready_go = 1'b1;   // MEM
+assign ws_ready_go = 1'b1;   // WB</code></pre>
+<p>对第 1–4 章的所有指令确实都是单拍完成，原写法没问题。但指导书 §5.1 要求"<i>当执行流水阶段上是一条除法指令时，仅当除法运算部件返回结果完成的信号之后，这一级流水的 ready_go 才能置为有效</i>"。</p>
+<p><b>本次已按此改造 EXE 级：</b></p>
+<pre><code>assign es_ready_go = !es_div_inst || es_div_ready;   // 除法未完成 → ready_go 不成立
+// es_div_ready = div_done | div_dout_valid（除法器 m_axis_dout_tvalid）</code></pre>
+<p>同时复查了当时提到的连带风险：<code>load_stall</code> 与 <code>es_is_load</code> 的条件<b>无需改</b>——因为本设计中除法与 load 是两条互斥的指令类型（<code>es_is_load</code> 只在 <code>res_from_mem</code> 时成立），而除法新增的是独立的 <code>div_stall</code>。<code>ex7</code> 镜像包含 <code>div</code> 后紧跟依赖指令、以及连续多条除法等场景，46 个测试点全部通过，说明这两条路径互不干扰。</p>
+<p><b>剩余待办：</b><code>ms_ready_go</code> / <code>ws_ready_go</code> 仍是常量 1。这对第 5 章没有影响（除法在 EXE 级就消化完了），但<b>做 AXI 总线或 Cache 创新项时需要一并改造</b>——那属于 MEM 级的多拍等待。</p>
+
+<h3>D5 <span class="badge b-warn">阻塞第 6 章</span> 完全没有异常判定与 CSR</h3>
+<p>现状：</p>
+<ul>
+  <li>无 ADEF（取指地址错）：<code>IF_stage.v</code> 对 <code>next_pc</code> 未做任何地址合法性检查；</li>
+  <li>无 ALE（地址非对齐）：<code>ld.w/st.w</code> 的地址 <code>alu_result[1:0]</code> 未检查；</li>
+  <li>无 INE（指令不存在）：见 D1，未知指令被当成 <code>add</code> 执行而不是报异常；</li>
+  <li>无 <code>syscall</code>(<code>0x06</code>)/<code>break</code>(<code>0x0000000d</code>)/<code>ertn</code>/<code>csrrd</code>/<code>csrwr</code>/<code>csrxchg</code>/<code>rdcntvl.w</code> 等指令的译码；</li>
+  <li>无 CSR 模块、无 <code>ertn_flush</code> 冲刷通路。</li>
+</ul>
+<p>指导书 §6.3 推荐"异常信息随指令带到写回级再统一报出、同时清空所有流水级缓存"，这套机制需要在 <code>ds_to_es_bus</code> 等各级总线里预留异常信息字段——当前总线的 160/75/70 bit 中<b>已预留了 1 位保留位（<code>DS_TO_ES</code> 最高位）与访存宽度/扩展标志，但异常信息字段仍不足</b>，届时需要一并扩宽。</p>
+
+<h3>D6 <span class="badge b-warn">正确但"未验证"</span> <code>~br_taken</code> 取消逻辑没有被当前镜像覆盖</h3>
+<p><span class="ev">位置：IF_stage.v:47</span></p>
+<p>代码本身正确（论证见 2.4）。问题在于<b>验证覆盖率为零</b>。核查证据：</p>
+<ul>
+  <li>当前工程的指令镜像 <code>func/obj/inst_ram.mif</code> 与 <code>for_test_obj/ex1_obj/inst_ram.mif</code> <b>MD5 完全相同</b>（<code>09b31b45…c108</code>）；</li>
+  <li>该镜像只含 <code>n1–n20</code> 共 20 个测试函数，且其反汇编显示 <code>NOP4</code> 展开成了 4 条真实 <code>addi.w $r0,$r0,0</code> ⇒ <b>该镜像是 NOP_INSERT=1 的构建</b>（对应 <code>make EXP=7</code>）；</li>
+  <li>逐条扫描该镜像的 12960 条分支/跳转，<b>其后一条指令全部是 NOP</b>（扫描报出的 118 条"非 NOP"全部落在 <code>0x1c008xxx</code> 数据区，是误判）。</li>
+</ul>
+<p>在"延迟槽恒为 NOP"的前提下，"取消"与"不取消"产生的 <b>黄金 Trace 完全一致</b>（NOP 不写寄存器，Trace 只在 <code>rf_we &amp;&amp; wnum!=0</code> 时记录）。因此当前仿真<b>无法证明也无法证伪</b>这条逻辑。<br>
+<b>它真正被检验的时机</b>是跑 <code>NOP_INSERT=0</code> 的镜像（<code>for_test_obj/ex2_obj</code>、<code>ex3_obj</code>，或 <code>make EXP=8/9/10…</code>）——那时 <code>TEST_BL</code>/<code>TEST_JIRL</code> 里 <code>bl 2000f</code> 的紧后一条就是真实的 <code>add.w a1, ra, zero</code>，取消逻辑一旦缺失，trace 立刻失配。</p>
+
+<h3>D7 <span class="badge b-ok">已全部修复</span> 三个"只赋值、从不被读"的死信号</h3>
+<table>
+  <thead><tr><th style="width:130px">信号</th><th style="width:200px">出现位置</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">load_op</td><td class="mono">原 ID_stage.v:56, 264</td><td><span class="badge b-ok">已删除</span> 原被赋值 <code>= inst_ld_w</code> 却从不被读。<code>res_from_mem</code> 已承担其职责。第 4 章改造时一并移除，全工程检索 <code>load_op</code> 零残留，综合不再产生 unused 警告。</td></tr>
+    <tr><td class="mono">need_si12</td><td class="mono">ID_stage.v:255, 268</td><td><span class="badge b-ok">已修复</span> 现在真正参与 <code>ds_imm</code> 的多路选择链，不再依赖 <code>default</code> 兜底。</td></tr>
+    <tr><td class="mono">need_si16</td><td class="mono">ID_stage.v:258, 411</td><td><span class="badge b-ok">已修复</span> 现在真正参与 <code>br_offs</code> 的选择（si26 → si16 → 0）。</td></tr>
+  </tbody>
+</table>
+
+<h3>D8 <span class="badge b-warn">dpic.v 已删除</span> <code>io_a0_val</code> 悬空</h3>
+<ul>
+  <li><code>RegFiles.v:14,39</code> 定义了 <code>io_a0_val</code>（a0/$r10 的调试观察口），但 <code>ID_stage.v</code> 例化寄存器堆时<b>没有连接该端口</b>。—— 仍待处理（保留端口即可，Verilog 允许输出悬空）。</li>
+  <li><span class="badge b-ok">已处理</span> <code>myCPU/dpic.v</code>（<code>EbreakDPIC / MemDPIC / RegfileDPIC / ITraceDPIC</code>）在全工程中没有任何一处例化，也未被写入 <code>loongson.xpr</code>，属于 NPC 框架的遗留死文件，<b>本次已删除</b>（备份于 <code>.workbuddy/backup/dpic.v.bak</code>）。删除后全工程检索 <code>dpic</code> 已无任何残留引用，仿真编译不受影响。</li>
+  <li>注意：设计本身把存储放在 RTL 的 <code>sync_ram</code> 里（而不是走 <code>MemDPIC</code> 的 DPI-C），这是<b>正确</b>的选择，不影响仿真。</li>
+</ul>
+
+<h3>D9 <span class="badge b-ok">已修复</span> 组合逻辑路径偏长（<b>原为时序风险，现已实测并修复</b>）</h3>
+<p><b>原判断：</b><code>br_taken</code> 的组合路径为
+<code>ID 译码 → 前递 mux → 比较器 → br_bus → IF(<code>~br_taken</code>) → fs_to_ds_valid/bus → ID 级寄存器</code>。
+当时这只是<b>经验判断</b>，未做实测。</p>
+<p><b>实测结果（证实判断成立，且比预想严重得多）：</b>在 <code>xc7a200tfbg676-1</code>（速度等级 -1）
+上跑完整综合实现后，<code>cpu_clk_clk_pll</code>（50MHz / 20ns）报告
+<code>WNS = -2.090ns、TNS = -857.955ns、违例端点 1356 / 10474</code>，
+<code>TIMING-16 Large setup violation: 274</code>。</p>
+<p><b>真正的长路径有两段，分两轮解决：</b></p>
+<ol>
+  <li><b>乘法器段（第 5 章引入）</b>：<code>DSP48E1 → PCOUT/PCIN 级联 → CARRY4×12（64 位积加法）
+      → EXE 级前递 → ID 级分支比较/跳转目标加法器 → IF next_pc → inst_ram ENARDEN</code>，
+      数据通路 22ns、逻辑 24 级。
+      <b>修法：把乘法器从 <code>alu.v</code> 物理移出到 <code>EXE_stage.v</code></b>，
+      结果只送 <code>es_to_ms_bus</code>、不进前递路径。→ WNS 改善到 -1.188ns。</li>
+  <li><b>访存段</b>：<code>data_ram(BRAM 输出) → 字节选取/扩展 → ID 前递 mux → 分支比较/转移加法
+      → IF next_pc → inst_ram 地址译码 → inst_ram ENARDEN</code>，
+      20.21ns，其中<b>布线 15.30ns 占 75.6%</b>。
+      <b>修法：给分支单开一条"不含 BRAM"的前递通路</b>
+      （<code>MEM_stage.v</code> 新增输出 <code>ms_forward_data_alu = ms_alu_result</code>，
+      ID 级新增 <code>rj_br_value</code>/<code>rkd_br_value</code>，分支比较与 jirl 转移目标全部改用它们）。</li>
+</ol>
+<div class="warn">
+  <b>★ 一个值得记住的方法论教训：</b>修这条访存路径时曾走过一步弯路——
+  先只加了"分支不消费 MEM 级 load 前递值"的功能规则（<code>branch_load_stall</code>），
+  结果<b>违例端点从 752 降到 371、TNS 从 -282ns 降到 -124ns，但 WNS 从 -1.188 变成 -1.264ns，几乎没动</b>。
+  原因：<b>只要那个含 BRAM 的信号还挂在多路选择器的"数据输入"上，静态时序分析就会照常分析这条路径</b>；
+  综合器的常量传播只认常量，不认运行期 <code>select</code>。
+  <b>要切断组合路径，必须换"数据源"，不能只让多路选择器"不选它"。</b>
+</div>
+<p><b>修复后结果：</b><code>cpu_clk_clk_pll</code> <b>WNS = +0.782ns、TNS = 0、违例端点 0 / 10442</b>，
+保持时间 0 违例，<code>TIMING-16</code> 告警 <b>274 → 0</b>；
+关键路径起点已从 <code>data_ram</code> 的 RAMB36 变为 ID 级触发器 <code>fs_to_ds_bus_r_reg[58]</code>。完整过程见 <b>5.4 节</b>。</p>
+
+<!-- ============================================================ -->
+<h2 id="s3">四、按指导书仍待实现的功能</h2>
+
+<h3>4.1 第 4 章：访存指令（6 条）<span class="badge b-ok">已完成并通过 ex6 验证</span></h3>
+<p><span class="ev">指导书 §4.1–§4.2</span> —— 实现细节见本文 <b>2.2 节（c）</b>，此处仅列结论：</p>
+<table>
+  <thead><tr><th style="width:220px">任务</th><th>结论</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">st.b / st.h</td><td><span class="badge b-ok">✔</span> EXE 级按 <code>alu_result[1:0]</code> 生成字节写使能（<code>00→0001 / 01→0010 / 10→0100 / 11→1000</code>，<code>st.h: 00→0011 / 10→1100</code>），写数据以"复制到各通道"的方式对齐。</td></tr>
+    <tr><td class="mono">ld.b / ld.h / ld.bu / ld.hu</td><td><span class="badge b-ok">✔</span> MEM 级按 <code>ms_alu_result[1:0]</code> + <code>mem_size</code> 选字节/半字，再按 <code>ld_signed</code> 做符号扩展（ld.b/ld.h）或零扩展（ld.bu/ld.hu）。</td></tr>
+    <tr><td>译码侧</td><td><span class="badge b-ok">✔</span> 新增 6 条 one-hot（<code>op=0x0a</code>，<code>[25:22]=0/1/8/9/4/5</code>），并统一修正 <code>gr_we / mem_we / res_from_mem / src_reg_is_rd / ds_use_rj / ds_use_rkd / need_si12 / src2_is_imm / alu_op[0]</code> 共 9 处。</td></tr>
+  </tbody>
+</table>
+<p><b>验证结果：</b><code>for_test_obj/ex6_obj</code> 镜像 → 黄金 trace 79750 行 → <b>39 个测试点全部 PASS</b>（<code>----PASS!!!</code>），且 ex1/ex3/ex4/ex5 回归无退化。</p>
+
+<h3>4.2 第 5 章：乘除运算类指令（7 条）<span class="badge b-ok">已完成并通过 ex7 验证</span></h3>
+<p><span class="ev">指导书 §5.1–§5.3</span></p>
+<ul>
+  <li><b>mul.w / mulh.w / mulh.wu</b>：用 <code>*</code> 实现（Vivado 映射到 DSP48，单周期）。<code>mul.w</code> 取乘积低 32 位；<code>mulh.w</code> 取有符号乘积高 32 位；<code>mulh.wu</code> 取无符号乘积高 32 位。<b>已实现。</b></li>
+  <li><b>div.w / mod.w / div.wu / mod.wu</b>：指导书<b>禁止</b>直接用 <code>/</code> 和 <code>%</code>（LUT 实现时序极差）。本设计按 §5.2 的许可<b>自行实现了电路级迭代除法器</b>（<code>divider.v</code>，Radix-2 恢复余数法），并刻意把接口做成与 Divider Generator 完全一致（含 <code>s_axis_*/m_axis_*</code> 全套握手信号、<code>[63:32]</code> 存商 / <code>[31:0]</code> 存余数），因此<b>如果导师要求必须用 IP，直接替换例化即可，EXE 级一行都不用改</b>。选择自研的理由：不依赖 IP、不会因为 IP 未生成导致综合失败，仿真环境也能独立跑通。<b>已实现。</b>
+    <ul>
+      <li>有符号 / 无符号各一个实例（<code>SIGNED</code> 参数化复用同一份代码）；</li>
+      <li>握手严格按指导书：未送数时 <code>tvalid=1</code>，采到 <code>tready</code> 后<b>立即撤销 tvalid</b>，然后等 <code>m_axis_dout_tvalid</code>；</li>
+      <li>除数为 0 时返回商 <code>0xFFFFFFFF</code>、余数 = 被除数，不触发异常（LA32R 规定除 0 结果任意且不报异常）。</li>
+    </ul>
+  </li>
+  <li><b>流水控制改造</b>：<code>es_ready_go</code> 从常量改为"除法完成才有 valid"的条件信号。<b>已完成。</b></li>
+  <li><b>新增长相关阻塞</b>：除法要占 EXE 数十拍，后继指令若依赖其结果必须阻塞（<code>div_stall</code>）。<b>已完成。</b></li>
+  <li>译码：<code>op=0x00 &amp; [25:22]=0</code>，乘法按 <code>[21:20]=1</code> + <code>[19:15]=0x18/0x19/0x1a</code> 区分；除法按 <code>[21:20]=2</code> + <code>[19:15]=0x00/0x01/0x02/0x03</code> 区分。<b>已实现。</b></li>
+</ul>
+<p><b>验证结果：</b><code>for_test_obj/ex7_obj</code>（含 n1–n46 全部指令，除乘除外还覆盖第 4 章访存）——黄金 trace 86846 行，<b>46 个功能测试点全部 PASS，零比对错误</b>。除法器算法另用 Python 逐位复现，与 n30~n36 的 1060 条测试向量逐条对拍零失配、与 C 语义 2 万组随机交叉验证零失配。</p>
+
+<h3>4.3 第 6 章：异常和中断支持 <span class="badge b-err">未开始</span></h3>
+<h4>第一阶段（团队分基础部分）</h4>
+<ul>
+  <li>新增指令：<code>csrrd</code>、<code>csrwr</code>、<code>csrxchg</code>、<code>ertn</code>、<code>syscall</code>；</li>
+  <li>新增 CSR（集中到一个 <code>csr.v</code> 模块）：<code>CRMD、PRMD、ESTAT、ERA、EENTRY、SAVE0~3</code>；</li>
+  <li>实现系统调用异常（SYS）通路。</li>
+</ul>
+<h4>第二阶段</h4>
+<ul>
+  <li>异常：<b>ADEF</b>（取指地址错）、<b>ALE</b>（地址非对齐）、<b>BRK</b>（断点，<code>0x0000000d</code>）、<b>INE</b>（指令不存在）；</li>
+  <li>中断：<b>2 个软件中断 + 8 个硬件中断 + 定时器中断</b>（共 12 个线中断）；</li>
+  <li>新增指令：<code>rdcntvl.w</code>、<code>rdcntvh.w</code>、<code>rdcntid</code>；</li>
+  <li>新增 CSR：<code>ECFG、BADV、TID、TCFG、TVAL、TICLR</code>。</li>
+</ul>
+<h4>关键实现要点（指导书 §6.3、§6.5）</h4>
+<ul>
+  <li><b>精确异常</b>：异常判定分布在各流水级，但异常信息随指令带到 <b>WB 级</b>才统一报出，同时清空所有流水级缓存、把 nextPC 指向异常入口（<code>EENTRY</code>）——这意味着各级总线要预留异常信息字段（当前 148/71/70 bit 中<b>没有预留</b>）；</li>
+  <li><b>CSR 相关冲突</b>：所有 CSR 读写指令都放在同一流水级处理（写者统计：<code>csrwr/csrxchg</code> 对 <code>CRMD.IE、ECFG.LIE、ECFG.IS、TCFG.En、TICLR.CLR</code> 的写 → 阻塞译码级标记中断的指令；<code>ERA、PRMD.PPLV/PIE</code> → 阻塞 <code>ertn</code>；<code>CRMD.IE</code> → 阻塞译码级指令）；</li>
+  <li><b><code>ertn_flush</code></b>：<code>ertn</code> 直到写回级才修改 <code>CRMD</code>，与此同时清空流水线并更新取指 PC（因为最早只能在译码级知道写者，光靠阻塞解决不了）；</li>
+  <li><b>特权级</b>：进入异常时 <code>CRMD.PLV</code> 置 0（内核态）、<code>PRMD</code> 保存原 PLV/IE，返回时恢复。</li>
+</ul>
+<p><b>验证镜像：</b><code>for_test_obj/ex8_obj</code>（第一阶段）、<code>ex9_obj</code>（增量：n47–n57 含 syscall/brk/ti/ine/soft_int/adef/ale_*）。</p>
+
+<h3>4.4 创新扩展（团队分 20 分）<span class="badge b-gray">未开始</span></h3>
+<p>指导书给出的选项（不必全做）：</p>
+<ul>
+  <li><b>AXI 总线接口设计</b>：把 CPU 顶层接口改为 AXI。工程里已备好 <code>soc_verify/soc_axi/</code>（含 <code>axi_wrap</code>、<code>axi_crossbar_1x2</code>、<code>axi_ram</code>、<code>clk_pll</code> 等 IP）可直接复用；</li>
+  <li><b>Cache 模块设计</b>：一路直接映射 Cache（二者都实现取 DataCache 成绩）、Cache 指令、多路组相连、Cache 流水化。工程里已备好 <code>module_verify/cache_verify/</code>；</li>
+  <li><b>外设功能扩展</b>：用汇编操控 SoC 已有外设；集成串口外设并汇编操控。</li>
+</ul>
+<p><b>注意：</b>AXI 与 Cache 都要求 <code>ms_ready_go / ws_ready_go</code> 可控。EXE 级的 <code>es_ready_go</code> 已在第 5 章改造完成（见 D4），做创新项时只需照同样的模式改造 MEM/WB 两级即可。</p>
+
+<h3>4.5 分值对应速查</h3>
+<table>
+  <thead><tr><th style="width:90px">分值</th><th style="width:110px">归属</th><th>内容</th><th style="width:120px">当前进度</th></tr></thead>
+  <tbody>
+    <tr><td>60 分</td><td>个人</td><td>第 1–5 章（五级流水 / 冲突处理 / 算术逻辑转移 / 访存 / 乘除）</td><td><b>5 / 5 章</b><br><span class="ev">全部实现并跑通 ex1~ex7</span></td></tr>
+    <tr><td>10 分</td><td>个人</td><td>实验报告（个人部分）</td><td>—</td></tr>
+    <tr><td>30 分</td><td>团队</td><td>创新基础：异常相关指令扩展（第 6 章）</td><td><span class="badge b-err">未开始</span></td></tr>
+    <tr><td>10 分</td><td>团队</td><td>实验报告（团队部分）</td><td>—</td></tr>
+    <tr><td>（含）</td><td>创新</td><td>AXI / Cache / 外设扩展（答辩展示）</td><td><span class="badge b-gray">未开始</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="s4">五、下一步计划（含本次已完成的修改）</h2>
+
+<h3>5.1 本次已完成的修改</h3>
+<table>
+  <thead><tr><th style="width:150px">文件</th><th>修改内容</th><th style="width:120px">验证</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">ID_stage.v</td><td><b>修正 slti/sltui 操作码</b>：<code>op_25_22 = 0xb/0xc → 0x8/0x9</code>（依据 A01 手册附录编码表 <code>SLTI=0000001000</code>、<code>SLTUI=0000001001</code>）。</td><td><span class="badge b-ok">ex4 差异测试 PASS</span></td></tr>
+    <tr><td class="mono">ID_stage.v</td><td><b>gr_we 改正向译码</b>（D1 高危项）。</td><td><span class="badge b-ok">ex1/ex3/ex4/ex5 PASS</span></td></tr>
+    <tr><td class="mono">ID_stage.v</td><td><code>ds_imm</code> 显式使用 <code>need_si12</code>、未译码指令兜底 0；<code>br_offs</code> 显式使用 <code>need_si16</code>。</td><td><span class="badge b-ok">PASS</span></td></tr>
+    <tr><td class="mono">ID_stage.v</td><td><b>移动 <code>load_stall</code> 声明</b>到使用之前（原 L332 → L37）。原写法 <code>xvlog</code> 报 <code>VRFC 10-3380 identifier used before its declaration</code>，属编译级错误。</td><td><span class="badge b-ok">编译通过</span></td></tr>
+    <tr><td class="mono">myCPU/dpic.v</td><td><b>删除</b>（死文件），全工程已无残留引用。</td><td><span class="badge b-ok">编译通过</span></td></tr>
+    <tr><td class="mono">ID_stage.v</td><td><b>第 4 章译码</b>：新增 <code>inst_ld_b/ld_h/ld_bu/ld_hu/st_b/st_h</code> 六条 one-hot，并新增汇总信号 <code>inst_ld_all/inst_st_all</code>、访存宽度 <code>ds_mem_size</code>、扩展标志 <code>ds_ld_signed</code>；统一修正 9 处控制信号；移除死信号 <code>load_op</code>。</td><td><span class="badge b-ok">ex6 PASS</span></td></tr>
+    <tr><td class="mono">EXE_stage.v</td><td><b>第 4 章字节写</b>：按 <code>alu_result[1:0]</code> 生成 st.b/st.h 写使能，写数据以"复制到各通道"方式对齐。</td><td><span class="badge b-ok">ex6 PASS</span></td></tr>
+    <tr><td class="mono">MEM_stage.v</td><td><b>第 4 章加载</b>：按 <code>ms_alu_result[1:0]</code> 选字节/半字，按 <code>ld_signed</code> 做符号/零扩展。</td><td><span class="badge b-ok">ex6 PASS</span></td></tr>
+    <tr><td class="mono">mycpu_h.v</td><td>总线位宽 <code>DS_TO_ES 148→152</code>（第 4 章 +<code>mem_size(3)+ld_signed(1)</code>），第 5 章再 <code>152→160</code>（<code>alu_op 12→16</code> 位 + <code>div_en/div_signed/div_rem</code> 3 位 + 1 位保留）；<code>ES_TO_MS 71→75</code>。</td><td><span class="badge b-ok">全镜像 PASS</span></td></tr>
+    <tr><td class="mono">divider.v</td><td><b>第 5 章新增文件</b>：Radix-2 迭代除法器，接口与 Xilinx Divider Generator 完全一致（<code>s_axis_*/m_axis_*</code> 握手 + <code>[63:32]</code> 商 / <code>[31:0]</code> 余数），<code>SIGNED</code> 参数化复用。已写入 <code>loongson.xpr</code>。</td><td><span class="badge b-ok">ex7 PASS</span></td></tr>
+    <tr><td class="mono">alu.v</td><td><b>第 5 章乘法</b>：<code>alu_op</code> 扩到 16 位，新增 <code>mul.w/mulh.w/mulh.wu</code> 三个独热操作，用 64 位有符号/无符号乘积分别取高低 32 位。</td><td><span class="badge b-ok">ex7 PASS</span></td></tr>
+    <tr><td class="mono">EXE_stage.v</td><td><b>第 5 章除法集成</b>：例化有符号/无符号两个 <code>divider</code>，实现 <code>tvalid/tready</code> 握手与撤销（<code>div_sent</code>）、结果锁存（<code>div_done/div_result_r</code>）、<code>es_ready_go</code> 结构化改造、除法结果与 ALU 结果多路选择、前递门控。</td><td><span class="badge b-ok">ex7 PASS</span></td></tr>
+    <tr><td class="mono">ID_stage.v</td><td><b>第 5 章译码与冲突</b>：新增 7 条乘除 one-hot 译码与 <code>alu_op[14:12]</code>；新增 <code>ds_div_en/div_signed/div_rem</code> 并打包；新增与 Load-Use 同构的 <code>div_stall</code> 阻塞，并把它并入 <code>ds_ready_go</code>。</td><td><span class="badge b-ok">ex7 PASS</span></td></tr>
+    <tr><td class="mono">mycpu_head.v</td><td>新增 <code>es_is_div</code> / <code>es_div_ready</code> 两条前递握手信号，连接 EXE → ID。</td><td><span class="badge b-ok">ex7 PASS</span></td></tr>
+  </tbody>
+</table>
+
+<h3>5.2 关键结论：本次验证的证据链</h3>
+<div class="ok">
+  <b>差异测试结果（自建 xsim 仿真环境，Vivado 2023.2）：</b>
+  <table>
+    <thead><tr><th style="width:110px">镜像</th><th style="width:110px">对应章节</th><th style="width:120px">黄金 Trace 行数</th><th style="width:130px">我的 CPU 测试点</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">ex1_obj</td><td>第 1 章（n1–n20）</td><td class="mono">46534</td><td class="mono">20 PASS</td><td><span class="badge b-ok">----PASS!!!</span></td></tr>
+      <tr><td class="mono">ex2_obj</td><td>第 1 章（补充）</td><td class="mono">46534</td><td class="mono">20 PASS</td><td><span class="badge b-ok">----PASS!!!</span></td></tr>
+      <tr><td class="mono">ex3_obj</td><td>第 2 章（前递）</td><td class="mono">46534</td><td class="mono">20 PASS</td><td><span class="badge b-ok">----PASS!!!</span></td></tr>
+      <tr><td class="mono">ex4_obj</td><td>第 3 章（算术逻辑）</td><td class="mono">62377</td><td class="mono">29 PASS</td><td><span class="badge b-ok">----PASS!!!</span></td></tr>
+      <tr><td class="mono">ex5_obj</td><td>第 3 章（转移指令）</td><td class="mono">71332</td><td class="mono">33 PASS</td><td><span class="badge b-ok">----PASS!!!</span></td></tr>
+      <tr><td class="mono">ex6_obj</td><td>第 4 章（访存指令）</td><td class="mono">79750</td><td class="mono">39 PASS</td><td><span class="badge b-ok">----PASS!!!</span></td></tr>
+      <tr><td class="mono">ex7_obj</td><td><b>第 5 章（乘除指令）</b></td><td class="mono">86846</td><td class="mono">46 PASS</td><td><span class="badge b-ok">----PASS!!!</span></td></tr>
+    </tbody>
+  </table>
+  <b>第 5 章回归结论：</b>ex7 一次通过（46/46，含 <code>div</code> 后紧跟依赖指令、连续多条除法等冲突场景），
+  且 ex1/ex2/ex3/ex4/ex5/ex6 <b>全部保持 PASS，无功能退化</b>。ex7 的仿真总时长 1359305 ns（约 13.6 万拍），
+  其中约 2 万拍消耗在 600 次除法迭代上（每次除法 33 拍），与 <code>es_ready_go</code> 门控的预期行为一致。
+  <b>对照实验（证明 slti/sltui 修复是必要的）：</b>把 <code>inst_slti/inst_sltui</code> 改回 <code>0xb/0xc</code> 后重跑 ex4，
+  仿真在第 <b>22 号功能测试点</b>（<code>time=640817ns</code>）出现 trace 失配——
+  <code>reference: PC=0x1c03b308 wnum=0x0a wdata=0x00000001</code> vs
+  <code>mycpu: PC=0x1c03cf38 wnum=0x0d wdata=0x16000000</code>；改回正确编码后 29 点全过。
+</div>
+
+<h3>5.3 接下来的顺序（从第 6 章开始）</h3>
+<ol>
+  <li><span class="badge b-ok">已完成</span> <b>第 4 章（访存指令）</b>：字节写使能 + 字节选取与扩展 + 6 条指令译码，<code>ex6_obj</code> 39/39 PASS。</li>
+  <li><span class="badge b-ok">已完成</span> <b>第 5 章（乘除指令）</b>：D4 结构化改造 + 自研 Radix-2 迭代除法器 + 7 条指令译码与除法 RAW 阻塞，<code>ex7_obj</code> 46/46 PASS。</li>
+  <li><b>做第 6 章（异常与中断，团队 40 分）</b>：CSR 模块 + <code>csrrd/csrwr/csrxchg/ertn/syscall/rdcnt*</code> + ADEF/ALE/INE/BRK/SYS + 12 个中断源 + 写回级精确异常冲刷；需同步扩宽各级总线以携带异常信息（<code>DS_TO_ES</code> 已预留 1 位保留位）。用 <code>ex8_obj</code>/<code>ex9_obj</code> 验证。</li>
+  <li><b>创新项</b>：优先做 AXI（工程骨架已备好，答辩易展示）；记得此时需要把 <code>ms_ready_go</code> 也改成可控（见 D4 剩余待办）。</li>
+</ol>
+
+<h4>每次换镜像时的检查清单</h4>
+<pre><code>1) cd func &amp;&amp; make EXP=&lt;N&gt;            # 生成新的 inst_ram.mif / data_ram.mif（需 LoongArch 交叉工具链）
+   或直接取用 for_test_obj/ex*_obj/ 下现成镜像
+2) 用 gettrace 工程重新生成 golden_trace.txt   # ← 最容易忘的一步
+3) 确认 soc_verify/soc_bram/rtl/xilinx_ip/inst_ram/inst_ram.mif 已同步
+4) 确认 mycpu_tb.v 的 END_PC 与 TRACE_REF_FILE 路径正确（当前 0x1c000100）
+5) 跑仿真，看 "----PASS!!!" 或 "Fail!!!Total %d errors!"</code></pre>
+<p><span class="ev">提示：本工程内已备有一套不依赖 Vivado 工程、只用 <code>xvlog/xelab/xsim</code> 即可运行的轻量回归脚本
+<code>.workbuddy/sim/run_regress.sh</code>（用行为级 <code>sync_ram</code> 顶替 Xilinx IP，并把 gettrace 黄金模型一起跑），
+换镜像后可直接一键重跑 ex1/ex3/ex4/ex5/ex6。</span></p>
+
+<h3 id="s-timing">5.4 50MHz 时序修复全过程（本轮核心工作）</h3>
+<p>这一节记录"实验评分卡在 69 分"的真正定位与修复过程。触发点是：9 条目标指令功能上<b>全部正确</b>
+（<code>ex4_obj</code> 29/29 PASS），但平台分数不涨；且平台形态是
+<b>"上传 bit → 远程 FPGA → 自动评测"</b>，所以问题必然在<b>时序</b>而不是功能。</p>
+
+<h4>（1）原始诊断</h4>
+<p>把工程接上 <code>xc7a200tfbg676-1</code>（速度等级 -1）跑完整综合实现，读 <code>report_timing_summary</code>：</p>
+<pre><code>cpu_clk_clk_pll (50MHz / 20ns)   WNS = -2.090ns   TNS = -857.955ns   违例端点 1356 / 10474
+TIMING-16 Large setup violation: 274</code></pre>
+<p>前 10 条违例路径的源<b>全部</b>是 <code>exe_stage/alu_inst/mul_unsigned_prod__*</code>。
+<b>结论：bit 上板必然算错，每一章都在丢分</b>——而非第 3 章单独丢分。</p>
+
+<h4>（2）关键路径一：乘法器（第 5 章引入）</h4>
+<p>路径形态：<code>DSP48E1 → PCOUT/PCIN 级联 → CARRY4×12（64 位积加法）→ EXE 级前递
+→ ID 级分支比较 / 跳转目标加法器 → IF next_pc → inst_ram ENARDEN</code>，数据通路 22ns、逻辑 24 级。</p>
+<table>
+  <thead><tr><th style="width:90px">版本</th><th style="width:330px">做法</th><th style="width:90px">WNS</th><th>结果</th></tr></thead>
+  <tbody>
+    <tr><td>❌ 第 1 版</td>
+        <td>只在 <code>es_forward_valid</code> 上加 <code>!es_mul_inst</code>，
+            并把 <code>es_forward_data</code> 写成 <code>es_mul_inst ? 0 : es_final_result</code></td>
+        <td class="mono">-3.082ns</td>
+        <td><b>反而恶化</b>。原因：乘法结果被并进 <code>alu.v</code> 的<b>结果或树</b>，
+            <code>alu_result</code> 是所有指令前递数据的来源；<code>op_mul</code> 是运行期信号而非常量，
+            综合器无法据此把乘法器从逻辑锥里剪掉，只好把它<b>复制进 ID 级</b>
+            （路径节点暴露：<code>id_stage/u_regfile/mul_unsigned_prod_i_40</code>）。</td></tr>
+    <tr><td>✅ 第 2 版</td>
+        <td><b>把乘法器从 <code>alu.v</code> 物理移出到 <code>EXE_stage.v</code></b>，并把结果拆成两条通路：
+            <code>es_forward_result = es_div_inst ? div_result : alu_result;</code>（<b>不含乘法</b>，供前递）<br>
+            <code>es_final_result&nbsp; = es_mul_inst ? mul_result : es_forward_result;</code>（含乘法，只送 <code>es_to_ms_bus</code>）<br>
+            <code>es_forward_data&nbsp;&nbsp; = es_forward_result;</code><br>
+            配套：<code>es_is_mul</code> 连线 + ID 级 <code>mul_stall</code>（与 <code>load_stall</code> 同构），乘法结果改由 MEM 级前递</td>
+        <td class="mono">-1.188ns</td>
+        <td>乘法器<b>从所有违例路径中消失</b>；违例端点 1356 → <b>752</b>（降 45%）。</td></tr>
+  </tbody>
+</table>
+
+<h4>（3）关键路径二：访存数据（本轮新浮现）</h4>
+<p>乘法器移出后，关键路径变成：
+<code>data_ram(BRAM 输出) → 字节选取/扩展（MEM 级）→ ID 级前递 mux → 分支比较 / 转移加法
+→ IF next_pc → inst_ram 地址译码 → inst_ram ENARDEN</code>，
+<b>20.21ns，其中布线 15.30ns 占 75.6%</b>，逻辑级 16 级；单条
+<code>inst_ram/…/ramloop[35].ram.ram_ena</code> 网络就占 4.27ns。</p>
+<p>这里走过一步<b>很有价值的弯路</b>：</p>
+<table>
+  <thead><tr><th style="width:90px">版本</th><th style="width:330px">做法</th><th style="width:90px">WNS</th><th>违例端点 / TNS</th></tr></thead>
+  <tbody>
+    <tr><td>⚠ 第 3 版</td>
+        <td>只改<b>功能规则</b>：新增 <code>branch_load_stall</code>，让分支遇到 MEM 级 load 时多阻塞一拍，
+            改由 WB 级前递提供结果（<code>ds_ready_go = ~load_stall &amp; ~div_stall &amp; ~mul_stall &amp; ~branch_load_stall</code>）</td>
+        <td class="mono">-1.264ns</td>
+        <td>端点 752 → <b>371</b>、TNS -282.5 → <b>-123.5ns</b>（都明显变好）<br>
+            <b>但 WNS 从 -1.188 变成 -1.264ns，几乎没动</b></td></tr>
+    <tr><td>✅ 第 4 版</td>
+        <td>改<b>数据源</b>：<code>MEM_stage.v</code> 新增输出
+            <code>ms_forward_data_alu = ms_alu_result</code>（直接来自 <code>es_to_ms_bus_r</code> 触发器，
+            <b>与 data_ram 无关</b>）；<code>ID_stage.v</code> 新增
+            <code>ms_br_fwd_ok = ms_forward_valid &amp;&amp; !ms_forward_is_load</code> 与
+            <code>rj_br_value</code>/<code>rkd_br_value</code> 两条<b>分支专用前递通路</b>；
+            <code>rj_eq_rd</code> / <code>rj_lt_rd</code> / <code>rj_ltu_rd</code> / <code>br_target</code> 的 jirl 分支全部改用新通路
+            （<code>rj_value</code>/<code>rkd_value</code> 仍供 <code>ds_to_es_bus</code> 走 EXE，互不干扰）</td>
+        <td class="mono">+0.782ns</td>
+        <td><b>端点 371 → 0，TNS → 0，时序收敛</b></td></tr>
+  </tbody>
+</table>
+
+<div class="warn">
+  <b>★ 方法论教训（本轮最有价值的收获）：</b><br>
+  <b>想切断一条组合路径，必须换"数据源"，不能只让多路选择器"不选它"。</b><br>
+  <code>ms_forward_data</code> 对 load 指令等于 data_ram 的读数据。第 3 版让分支在功能上不再选择它，
+  但只要求它<b>仍然挂在多路选择器的数据输入脚上</b>，静态时序分析就会照常分析这条路径——
+  综合器的常量传播只认常量，不认运行期 <code>select</code>。
+  这解释了为什么"违例数量减半但最差路径纹丝不动"。
+  第 4 版把数据源换成<b>与 BRAM 无关的触发器输出</b>，路径才真正消失。<br>
+  另外这两版<b>必须成对使用</b>：<code>branch_load_stall</code> 负责功能正确性
+  （否则分支会读到 load 的"地址"而不是数据），换源负责物理切断路径。
+</div>
+
+<h4>（4）最终结果</h4>
+<pre><code>cpu_clk_clk_pll (50MHz / 20ns)   WNS = +0.782ns   TNS = 0.000ns   违例端点 0 / 10442
+                                 保持 WHS = +0.082ns，0 违例
+TIMING-16 Large setup violation: 274 → 0
+Router Completed Successfully / write_bitstream completed successfully</code></pre>
+<p>关键路径起点已从 <code>data_ram</code> 的 RAMB36 <b>变成 ID 级触发器 <code>fs_to_ds_bus_r_reg[58]</code></b>
+——这正是"换数据源"生效的直接证据。新关键路径为
+<code>fs_to_ds_bus_r[58] → 分支 PC 加法 → next_pc mux → inst_ram 地址译码 → ENARDEN</code>，
+18.884ns（逻辑仅 3.347ns / 18 级，<b>布线 15.537ns 占 82%</b>）。</p>
+
+<table>
+  <thead><tr><th style="width:230px">版本</th><th style="width:110px">WNS</th><th style="width:130px">TNS</th><th>违例端点</th></tr></thead>
+  <tbody>
+    <tr><td>原始</td><td class="mono">-2.090ns</td><td class="mono">-857.955ns</td><td class="mono">1356</td></tr>
+    <tr><td>第 1 版（只在 valid 上屏蔽乘法）</td><td class="mono">-3.082ns</td><td class="mono">—</td><td class="mono">2383</td></tr>
+    <tr><td>第 2 版（乘法器移出 ALU）</td><td class="mono">-1.188ns</td><td class="mono">-282.484ns</td><td class="mono">752</td></tr>
+    <tr><td>第 3 版（分支等 load，只改功能）</td><td class="mono">-1.264ns</td><td class="mono">-123.506ns</td><td class="mono">371</td></tr>
+    <tr><td><b>第 4 版（分支操作数换源）</b></td><td class="mono"><b>+0.782ns</b></td><td class="mono"><b>0</b></td><td class="mono"><b>0</b></td></tr>
+  </tbody>
+</table>
+
+<h4>（5）为什么余量只有 +0.78ns：根因是物理布局，不是逻辑深度</h4>
+<p>读 <code>report_utilization</code> 后原因很清楚：</p>
+<table>
+  <thead><tr><th style="width:200px">资源</th><th style="width:150px">用量</th><th style="width:120px">占比</th><th>说明</th></tr></thead>
+  <tbody>
+    <tr><td>Slice LUT</td><td class="mono">3389 / 134600</td><td class="mono">2.52%</td><td>逻辑极度稀疏</td></tr>
+    <tr><td>Slice Register</td><td class="mono">2416 / 269200</td><td class="mono">0.90%</td><td>逻辑极度稀疏</td></tr>
+    <tr><td><b>Block RAM Tile</b></td><td class="mono"><b>320 / 365</b></td><td class="mono"><b>87.67%</b></td><td><b>块 RAM 几乎铺满全片</b></td></tr>
+    <tr><td>DSP</td><td class="mono">7 / 740</td><td class="mono">0.95%</td><td>三条乘法共用</td></tr>
+  </tbody>
+</table>
+<p><code>inst_ram</code>（ADDR_WIDTH=18 → 256 个 RAMB36）加 <code>data_ram</code>（ADDR_WIDTH=16 → 64 个）
+一共 320 个块 RAM，占全器件 87.67%，<b>必然铺满整个 die</b>；
+而 CPU 逻辑只占 2.5%。于是在物理上，
+"CPU 的 PC/地址 → 分散在全片的 256 个 <code>inst_ram</code> BRAM 的地址与使能译码"
+这段布线天然就很长（18.884ns 里 15.537ns 是布线，占 82%；其中单条
+<code>ram_ena</code> 网络就吃掉 4.27ns）。</p>
+<p><b>要更大余量的方向</b>（本次未做，因为会增加与课程环境不一致的风险）：
+① 缩小 <code>inst_ram</code> 的 <code>ADDR_WIDTH</code>（但需同步改 <code>.mif</code> 与地址映射，可能影响评测程序的装载方式）；
+② 用更强的布局布线策略（<code>place_design -directive Explore</code> + <code>route_design -directive AggressiveExplore</code> + 物理优化）。
+需强调：<b>+0.782ns 已经是"时序达标"</b>，Vivado 的分析已包含最差工艺角、时钟抖动与时钟偏斜，
+bit 在 50MHz 下可以正确工作。</p>
+
+<h4>（6）功能验证：四轮改动均无功能退化</h4>
+<p>每次时序改动后都重跑七套镜像的 trace 差异测试：</p>
+<pre><code>ex1 : 20 PASS   ex2 : 20 PASS   ex3 : 20 PASS   ex4 : 29 PASS
+ex5 : 33 PASS   ex6 : 39 PASS   ex7 : 46 PASS   比对错误全部为 0</code></pre>
+<p>合计 <b>207 个功能测试点全部 PASS</b>。特别是第 4 版把分支操作数换了源，
+<code>ex5_obj</code>（第 3 章转移指令，33 点，专门考分支）与 <code>ex6_obj</code>（访存 + 分支依赖 load）
+仍全绿，说明"分支不消费 MEM 级 load 数据 + 改从 WB 取"这条改动在功能上完全等价。</p>
+
+<h4>（7）产物与复现方式</h4>
+<ul>
+  <li>bit 文件：<code>cdp_ede_local-master/mycpu_env/soc_verify/soc_bram/run_vivado/project/loongson.runs/impl_1/looongson_remote_top.bit</code></li>
+  <li>一键重跑实现：<code>.workbuddy/sim/rebuild_bit.tcl</code></li>
+  <li>时序/资源报告：<code>.workbuddy/sim/timing_after_fix.rpt</code>、<code>.workbuddy/sim/util_after_fix.rpt</code></li>
+  <li>功能回归：<code>.workbuddy/sim/run_regress.sh</code></li>
+</ul>
+<div class="warn">
+  <b>下一步待用户确认：</b>把新的 <code>looongson_remote_top.bit</code> 上传校内赛平台复测 EXP4
+  （以及第 1~5 章其余各项），确认分数是否随"时序收敛"一起上升。
+  若分数确有提升，则"69 分 = 时序不收敛"的结论就被最终确认；
+  若仍停在 69 分，则说明另有原因（例如评测打分本身以"章节覆盖 + 报告"为主），
+  届时应改从评测口径而不是 RTL 侧继续排查。
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s5">六、附录：本次核查的方法与证据</h2>
+
+<h3>6.1 代码侧核查</h3>
+<p>逐行通读了 <code>myCPU/</code> 下全部 11 个 Verilog 文件（<code>mycpu_head.v / mycpu_h.v / IF_stage.v / ID_stage.v / EXE_stage.v / MEM_stage.v / WB_stage.v / alu.v / RegFiles.v / tools.v</code>，<code>dpic.v</code> 已删除，<code>divider.v</code> 为第 5 章新增），并对 46 条指令逐条比对"编码位段 → one-hot 译码 → ALU 操作码 → 立即数选择 → 控制信号 → 总线打包"六项是否一致；对 <code>mycpu_h.v</code> 的 6 个位宽宏与各级实际打包字段做了逐位求和校验（160/75/70/38 全部吻合）。第 3、4、5 章共 26 条指令的编码位段，逐一对照 <code>A01_龙芯架构32位精简版参考手册</code> 附录的逐位编码表复核——正是这一步查出了 <code>slti/sltui</code> 的操作码错误，并确认 <code>LD.B=0A/0、LD.H=0A/1、ST.B=0A/4、ST.H=0A/5、LD.BU=0A/8、LD.HU=0A/9</code>、<code>MUL.W=00/0/1/0x18</code>、<code>MULH.W=…/0x19</code>、<code>MULH.WU=…/0x1a</code>、<code>DIV.W=00/0/2/0x00</code>、<code>MOD.W=…/0x01</code>、<code>DIV.WU=…/0x02</code>、<code>MOD.WU=…/0x03</code>。</p>
+
+<h3>6.1b 仿真侧核查（本次新增）</h3>
+<p>用 Vivado 2023.2 的 <code>xvlog / xelab / xsim</code> 搭建了一套不依赖 Vivado 工程文件的轻量差异测试环境，位于 <code>.workbuddy/sim/</code>：</p>
+<ul>
+  <li>把 <code>gettrace</code> 的单周期黄金模型（纯 Verilog，无需 Xilinx IP）单独编译运行，对每套镜像重新生成 <code>golden_trace.txt</code>；</li>
+  <li>用 <code>soc_bram</code> 的 <code>soc_lite_top.v</code> + <code>mycpu_tb.v</code> + 行为级 <code>sync_ram.v</code>（顶替 <code>inst_ram/data_ram</code> IP）编译本 CPU，跑同一套镜像做逐条 trace 比对；</li>
+  <li>脚本 <code>.workbuddy/sim/run_regress.sh</code> 一键完成七套镜像（ex1/ex2/ex3/ex4/ex5/ex6/ex7）的编译与回归，并自动把 <code>gettrace</code> 黄金模型一起重跑；</li>
+  <li>另外单独跑了一次 <code>synth_design -rtl -top mycpu_top</code> 做综合前 elaboration 检查，结果零 ERROR、零 Critical Warning。</li>
+</ul>
+<p><b>顺带发现并修复的两处"验证环境"问题</b>（只影响仿真，不影响综合）：<br>
+① <code>testbench/mycpu_tb.v</code> 第 237 行有一处空语句 <code>;//$finish;</code>，Vivado <code>xvlog</code> 报
+<code>VRFC 10-2096 empty statement in sequential block</code>，<b>整个 tb 模块被拒绝编译</b>——
+也就是说工程内的行为仿真此前根本跑不起来。已改写为语义完全等价的
+<code>if(uart_data!=8'hff) $write("%c",uart_data);</code>，重新编译<b>零 ERROR</b>。<br>
+② <code>myCPU/ID_stage.v</code> 的 <code>load_stall</code> 先用后声明，<code>xvlog</code> 报 <code>VRFC 10-3380</code>。
+已将声明提前，同样已修好。</p>
+
+<h3>6.2 "当前验证到哪一步"的判定依据</h3>
+<table>
+  <thead><tr><th style="width:250px">证据</th><th>结论</th></tr></thead>
+  <tbody>
+    <tr><td>MD5 比对：<code>func/obj/inst_ram.mif</code> == <code>for_test_obj/ex1_obj/inst_ram.mif</code>（<code>09b31b45…c108</code>）</td><td>工程当前加载的就是 ex1 的镜像</td></tr>
+    <tr><td>反汇编 <code>ex1_obj/test.s</code>，检索 <code>&lt;n*_test&gt;</code> 标号</td><td>只有 <code>n1–n20</code> 共 20 个测试函数，无 n21 及以上</td></tr>
+    <tr><td>反汇编中 <code>NOP4</code> 展开为 4 条真实 <code>addi.w $r0,$r0,0</code>；<code>LI()</code> 展开为 <code>lu12i.w + 4×NOP + addi.w</code></td><td>该镜像为 <code>NOP_INSERT=1</code> 构建（对应 <code>make EXP=7</code>）</td></tr>
+    <tr><td>解析 <code>golden_trace.txt</code>（46534 条）中所有唯一 PC，回查 <code>inst_ram.mif</code> 逐条译码</td><td>实际执行且写寄存器的指令只有 15 种：<code>lu12i.w、addi.w、add.w、bl、ld.w、or、slli.w、xor、sltu、nor、srli.w、srai.w、sub.w、slt、and</code>——正好是 n1–n20 覆盖的范围</td></tr>
+    <tr><td>扫描全镜像 12960 条分支/跳转的后继字</td><td>后继指令<b>全部为 NOP</b>（118 条"看似非 NOP"的落在 <code>0x1c008xxx</code> 数据区）</td></tr>
+    <tr><td>检索 <code>EbreakDPIC/MemDPIC/RegfileDPIC/ITraceDPIC/io_a0_val</code> 全工程引用</td><td>除定义处外无任何例化，<code>dpic.v</code> 为死文件 → <b>已删除</b>（删后复检 <code>dpic</code> 零残留）</td></tr>
+    <tr><td>对照 A01 手册附录逐位编码表复核第 3 章 13 条指令</td><td>发现 <code>slti/sltui</code> 操作码应为 <code>0x8/0x9</code>，原代码写作 <code>0xb/0xc</code> → <b>已修复</b></td></tr>
+    <tr><td>用 xsim 对 ex1/ex2/ex3/ex4/ex5/ex6/ex7 七套镜像做 trace 差异测试</td><td>七套全部 <code>----PASS!!!</code>；对照实验中改回错误操作码则第 22 个测试点即失配</td></tr>
+    <tr><td>用 Python 逐位复现 <code>divider.v</code> 的 Radix-2 算法，与 <code>n30~n36</code> 的 1060 条测试向量对拍 + 2 万组随机交叉验证</td><td><b>零失配</b>，除法的商/余数与符号语义完全正确</td></tr>
+    <tr><td>遍历 <code>ex7_obj/inst_ram.mif</code> 做指令分布统计</td><td>确认镜像确实包含 <code>mul.w/mulh.w/mulh.wu/div.w/mod.w/div.wu/mod.wu</code> 全部 7 条（另有第 4 章 6 条访存指令）</td></tr>
+    <tr><td><code>loongson.xpr</code> 源文件引用列表</td><td>已接入 myCPU 下 <b>10</b> 个 .v（含新增的 <code>divider.v</code>，不含已删除的 <code>dpic.v</code>），工程配置就绪</td></tr>
+    <tr><td>完整跑通 <code>synth_design</code> + <code>place_design</code> + <code>route_design</code> + <code>write_bitstream</code>（器件 <code>xc7a200tfbg676-1</code>）</td><td>四轮迭代均成功出 bit；每轮读 <code>report_timing_summary</code> 定位关键路径，逐轮收敛</td></tr>
+    <tr><td>读取 <code>report_timing_summary</code> 的 <code>Intra Clock Table</code> 与最差路径明细</td><td>最终 <code>cpu_clk_clk_pll</code> <b>WNS=+0.782ns、TNS=0、违例端点 0/10442</b>；关键路径起点由 <code>data_ram</code> 的 RAMB36 变为 ID 级触发器 —— 证明"换数据源"确实切断了路径</td></tr>
+    <tr><td>读取 <code>report_utilization</code></td><td>Slice LUT 3389（2.52%）、Slice Register 2416（0.90%）、<b>Block RAM Tile 320/365（87.67%）</b>——解释了关键路径为何以布线为主</td></tr>
+    <tr><td>比对处理后的 <code>*.bit</code>：<code>Router Completed Successfully</code> / <code>write_bitstream completed successfully</code> / <code>TIMING-16</code> 计数</td><td>布线 100% 完成、bit 正常生成；<code>TIMING-16 Large setup violation</code> 由 <b>274 → 0</b></td></tr>
+  </tbody>
+</table>
+
+<h3>6.3 本次核查未覆盖的范围</h3>
+<ul>
+  <li><b>（原列项已更新）</b>完整的 Vivado 综合/实现与上板时序分析<b>已完成</b>：
+      在 <code>xc7a200tfbg676-1</code> 上全流程跑通，50MHz 时序已收敛（WNS +0.782ns / 0 违例），
+      详见 <b>5.4 节</b>。剩余未覆盖的是<b>真机（远程 FPGA 板）实测</b>——需由用户上传 bit 到校内赛平台确认。</li>
+  <li><b>时序余量偏薄</b>：+0.782ns（约 3.9% 裕度）。根因是 <code>inst_ram</code>（ADDR_WIDTH=18，256 个 RAMB36）
+      + <code>data_ram</code>（64 个）<b>占满了 87.67% 的块 RAM</b>，块 RAM 铺满全片导致
+      CPU→<code>inst_ram</code> 的地址/使能译码布线必然很长（关键路径 18.884ns 中布线占 15.537ns / 82%）。
+      若要更大余量，方向是"缩小 <code>inst_ram</code> 深度"或"用更强的布局布线策略"，
+      但都会增加与课程环境不一致的风险，本次未做。</li>
+  <li><b><code>divider.v</code> 上板时序未单独约束</b>：32 拍迭代器的关键路径是一条 33 位减法比较链，
+      但在本次时序报告中<b>并未出现在违例路径里</b>，说明 50MHz 下余量充足。</li>
+  <li>第 6 章所需指令的完整编码表未逐位抄录（指导书未附完整编码表，A01 手册附录 B 的表格在 PDF 文本抽取中版式损坏）——实现时请以 <code>A01_龙芯架构32位精简版参考手册.pdf</code> §2.2 的正本为准。</li>
+</ul>
+
+<hr>
+<footer>
+  报告首次生成于对 <code>Main_project_1.1</code> 的静态代码核查 · <b>2026-10-15 更新</b>：<br>
+  ① 第 3 章指令修复（<code>slti/sltui</code> 操作码、<code>gr_we</code> 正向译码、<code>load_stall</code> 声明顺序）与 <code>dpic.v</code> 删除，ex4/ex5 跑通；<br>
+  ② 第 4 章访存指令（6 条 + 字节写使能 + 字节选取与扩展），ex6 跑通；<br>
+  ③ <b>第 5 章乘除指令（7 条 + 自研 Radix-2 迭代除法器 <code>divider.v</code> + <code>es_ready_go</code> 结构化改造 + 除法 RAW 阻塞），ex7 一次跑通 46/46</b>；<br>
+  ④ ex1~ex7 七套参考镜像全回归零退化，并通过综合前 elaboration 检查<br>
+  上游参考：<code>计组课设指导书LA版-2025</code>（主）、<code>A01 龙芯架构32位精简版参考手册</code>、<code>A03 LoongArch32R 单周期处理器手册</code>、<code>A02 计组课设指导书2018</code>、<code>A04 CPU仿真调试说明</code>
+</footer>
+
+</div>
+</body>
+</html>
