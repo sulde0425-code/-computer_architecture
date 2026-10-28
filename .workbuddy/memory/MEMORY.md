@@ -1,7 +1,12 @@
 # 项目长期记忆 — LoongArch(LA32R) 五级流水 CPU 课设
 （详细过程见 .workbuddy/memory/2026-10-15.md 与 2026-10-16.md）
 
-## 工程路径
+## 工程路径 / 版本
+- git 远程：`git@github.com:sulde0425-code/-computer_architecture.git`（SSH 可直接 push），分支 main
+- 提交：`af05f2a` 初始提交 → **`e69240d`** 全章通过存档；标签 **`exp9-full-pass`** → e69240d
+- 不入库（.gitignore 既定策略）：`*.bit`、`**/*.runs/`、`*.dcp`、`*.rpt`、
+  `.workbuddy/memory/2026-*.md`（只提交 MEMORY.md）、`.workbuddy/sim/bram_init_exp*.txt`
+
 - RTL：`Main_project_1.1/cdp_ede_local-master/mycpu_env/myCPU/`（12 个 .v：含 divider.v、csr.v；dpic.v 已删，备份 `.workbuddy/backup/`）
 - 验证环境：`soc_verify/soc_bram/`；tb=`testbench/mycpu_tb.v`+`sync_ram.v`；工程=`run_vivado/project/loongson.xpr`（xc7a200tfbg676-1）
 - 测试镜像：`Main_project_1.1/for_test_obj/ex1..ex9_obj`（ex1/2/3=第1章，ex4/5=第3章算逻/转移，ex6=第4章访存，ex7=第5章乘除，ex8/9=异常）
