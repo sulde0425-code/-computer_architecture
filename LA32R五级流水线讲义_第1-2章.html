@@ -81,6 +81,10 @@
   hr{border:none;border-top:1px solid var(--line);margin:26px 0}
   .center{text-align:center}
   .small{font-size:12.8px;color:var(--ink2)}
+  .quote{border-left:3px solid var(--purple);background:var(--purple-bg);border-radius:0 10px 10px 0;
+         padding:12px 18px;margin:12px 0;font-size:13.2px;line-height:1.72}
+  .quote p{margin:6px 0}
+  .quote .src{display:block;font-size:12px;color:var(--ink3);margin-top:8px}
 </style>
 </head>
 <body>
@@ -100,7 +104,7 @@
     <li><a href="#s2">第 1 章核心 · 握手规范 valid / allowin / ready_go</a></li>
     <li><a href="#s3">每级内部：计算模块 与 寄存模块 必须分开</a></li>
     <li><a href="#s4">级间总线：位宽、打包与排线图</a></li>
-    <li><a href="#s5">存储器：inst_sram_en / data_sram_en 片选 + BRAM 实现</a></li>
+    <li><a href="#s5">存储器：教材想让你怎么用 RAM → 片选 + BRAM 实现</a></li>
     <li><a href="#s6">第 2 章 · 数据前递（EXE&gt;MEM&gt;WB）与 Load-Use 阻塞</a></li>
     <li><a href="#s7">特殊情况全覆盖清单 + 汇报要点</a></li>
   </ol>
@@ -564,6 +568,191 @@ ID 这一拍收不到东西（<code>fs_to_ds_valid=0</code>），下一拍 IF �
 <!-- ======================= §5 ======================= -->
 <h2 id="s5">5 · 存储器：片选信号与 BRAM 实现</h2>
 
+<!-- ---------- §5.0 教材设计意图 ---------- -->
+<h3>5.0 回到源头：这个工程一开始，是打算让你怎么用 RAM 的？</h3>
+
+<p>5.1 往后讲的是"现在工程里 RAM 究竟怎么接"。但在那之前，有一个更根本的问题值得先弄清楚，
+而且它<b>直接决定了整套流水线为什么可以这么简单</b>。</p>
+
+<h4>① 先破除一个误解：RAM 不用你写</h4>
+
+<p>很多人刚开始以为要自己在 CPU 里用 <code>reg [31:0] ram[...]</code> 搭一个存储阵列。不是的。
+<b>RAM 由 SoC 提供，你的 myCPU 只是通过一组固定接口信号去"访问"它</b>——
+就像写程序的人不需要自己造内存条。</p>
+
+<div class="fig">
+<svg viewBox="0 0 900 300" role="img" aria-label="CPU 与 RAM 的职责边界">
+  <title>CPU 与 RAM 的职责边界</title>
+  <desc>myCPU 只发出请求信号并接收返回数据，inst_ram 与 data_ram 实体位于 soc_bram 的 xilinx_ip 中，由官方提供。</desc>
+
+  <!-- 左：myCPU -->
+  <rect x="24" y="40" width="300" height="230" rx="14" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.6"/>
+  <text x="174" y="66" font-size="13.5" font-weight="600" text-anchor="middle" fill="#173404">myCPU/　—— 你负责写的</text>
+
+  <rect x="46" y="82" width="256" height="52" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.5"/>
+  <text x="174" y="101" font-size="12" font-weight="600" text-anchor="middle" fill="#2C2C2A">IF_stage</text>
+  <text x="174" y="121" font-size="11.4" text-anchor="middle" fill="#5F5E5A">inst_sram_en / inst_sram_addr</text>
+
+  <rect x="46" y="146" width="256" height="52" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.5"/>
+  <text x="174" y="165" font-size="12" font-weight="600" text-anchor="middle" fill="#2C2C2A">EXE_stage</text>
+  <text x="174" y="185" font-size="11.4" text-anchor="middle" fill="#5F5E5A">data_sram_en / addr / we / wdata</text>
+
+  <rect x="46" y="212" width="256" height="40" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.5"/>
+  <text x="174" y="236" font-size="11.6" text-anchor="middle" fill="#3B6D11">← 收到 rdata，当作普通数据用</text>
+
+  <!-- 中：箭头 -->
+  <path d="M336 108 L556 108" stroke="#185FA5" stroke-width="1.6" fill="none" marker-end="url(#arB)"/>
+  <text x="446" y="100" font-size="11.8" font-weight="600" text-anchor="middle" fill="#185FA5">请求：当拍发出</text>
+  <path d="M556 232 L336 232" stroke="#993C1D" stroke-width="1.6" fill="none" marker-end="url(#arR)"/>
+  <text x="446" y="250" font-size="11.8" font-weight="600" text-anchor="middle" fill="#993C1D">返回：下一拍到达</text>
+  <defs>
+    <marker id="arB" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+      <path d="M0,0 L8,3.2 L0,6.4 z" fill="#185FA5"/>
+    </marker>
+    <marker id="arR" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+      <path d="M0,0 L8,3.2 L0,6.4 z" fill="#993C1D"/>
+    </marker>
+  </defs>
+
+  <!-- 右：SoC -->
+  <rect x="576" y="40" width="300" height="230" rx="14" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+  <text x="726" y="66" font-size="13.5" font-weight="600" text-anchor="middle" fill="#26215C">soc_bram/　—— 官方已给好</text>
+
+  <rect x="598" y="82" width="256" height="52" rx="8" fill="#FFFFFF" stroke="#AFA9EC" stroke-width="0.5"/>
+  <text x="726" y="101" font-size="12" font-weight="600" text-anchor="middle" fill="#2C2C2A">inst_ram（block RAM IP）</text>
+  <text x="726" y="121" font-size="11.4" text-anchor="middle" fill="#5F5E5A">256 × RAMB36E1　·　只读</text>
+
+  <rect x="598" y="146" width="256" height="52" rx="8" fill="#FFFFFF" stroke="#AFA9EC" stroke-width="0.5"/>
+  <text x="726" y="165" font-size="12" font-weight="600" text-anchor="middle" fill="#2C2C2A">data_ram（block RAM IP）</text>
+  <text x="726" y="185" font-size="11.4" text-anchor="middle" fill="#5F5E5A">经 bridge_1x2 与 confreg 二选一</text>
+
+  <rect x="598" y="212" width="256" height="40" rx="8" fill="#FFFFFF" stroke="#AFA9EC" stroke-width="0.5"/>
+  <text x="726" y="236" font-size="11.6" text-anchor="middle" fill="#534AB7">仿真时换成行为级 sync_ram.v</text>
+</svg>
+<div class="cap">图 3A · 职责边界：你的代码到"发出请求信号"为止，RAM 本体不在 myCPU 里</div>
+</div>
+
+<div class="box note">
+<b>汇报时可以这样说</b>：本设计采用<b>处理器与存储器分离</b>的结构。CPU 内部不实现任何存储阵列，
+只通过一组类 SRAM 接口（片选、字节写使能、地址、写数据、读数据）访问 SoC 提供的片内 block RAM。
+好处是<b>CPU 主体与存储器件解耦</b>——换一个 SoC（BRAM / AXI / 外部 SRAM）不用改处理器逻辑。
+</div>
+
+<h4>② 教材给你的起点：只改两处接口，不加逻辑</h4>
+
+<p>指导书第 1 章布置的任务其实非常克制——<b>把上学期的单周期 CPU 直接搬进来，只改接口</b>：</p>
+
+<div class="quote">
+<p>将上学期的单周期处理器代码转移到给出的 myCPU 文件夹中，直接覆盖代码即可，
+使用 soc_bram/ 子目录使用 tcl 命令创建工程，在此基础上开始进行第一个实验的实现：</p>
+<p>■ 调整 CPU 顶层接口，<b>增加</b>指令 RAM 的片选信号 <code>inst_sram_en</code> 和数据 RAM 的片选信号 <code>data_sram_en</code>。</p>
+<p>■ 调整 CPU 顶层接口，将 <code>inst_sram_we</code> 和 <code>data_sram_we</code> 都从 <b>1 比特</b>的写使能调整为 <b>4 比特</b>的字节写使能。</p>
+<p>■ 设计一个<b>不考虑相关引发的冲突</b>的单发射五级流水 CPU。</p>
+<p>■ 运行对应的 func，要求成功通过仿真和上板验证。</p>
+<span class="src">——《计算机组成原理实验指导书》1.5 实验要求</span>
+</div>
+
+<div class="box ok">
+<b>划重点</b>：第 1 章明确要求做的是"不考虑冲突"的五级流水。
+也就是说教材是<b>分两步走</b>的——先把骨架搭起来（第 1 章，不管冲突），再解决冲突（第 2 章，前递与阻塞）。
+你汇报时按这个顺序讲，逻辑最顺，也最能体现"为什么需要第 2 章"。
+</div>
+
+<h4>③ 核心假设：block RAM「一定可以返回」</h4>
+
+<p>这才是"想让你怎么用 RAM"的真正答案。指导书 1.3 节逐条解释了<b>每一级为什么 <code>ready_go</code> 可以恒为 1</b>：</p>
+
+<div class="quote">
+<p>对于 IF 流水阶段来说，由于目前只从指令 RAM 中取回指令，因此当指令位于取指阶段的时候，
+<b>指令 RAM 一定可以返回指令码</b>，于是取指阶段的 ready_go 信号恒为 1。</p>
+<p>对于 ID 流水阶段来说……由于译码、读寄存器堆都是一拍之内一定可以完成的，所以译码阶段的 ready_go 信号恒为 1。</p>
+<p>对于 EXE 流水阶段来说，由于目前处理的所有指令在这一阶段均只需要一拍就可以完成，所以 EXE 阶段的 ready_go 信号恒为 1。</p>
+<p>对于 MEM 流水阶段来说，由于目前只从数据 RAM 中取回数据，因此当 load 类指令位于 MEM 阶段的时候，
+<b>数据 RAM 一定可以返回数据</b>，于是 MEM 阶段的 ready_go 信号恒为 1。</p>
+<span class="src">——《计算机组成原理实验指导书》1.3 信号控制</span>
+</div>
+
+<table>
+<thead><tr><th style="width:80px">流水级</th><th>指导书给出的理由</th><th style="width:110px">ready_go</th></tr></thead>
+<tbody>
+<tr><td><b>IF</b></td><td>只从指令 RAM 取指，指令 RAM 一定可以返回</td><td class="mono">恒为 1</td></tr>
+<tr><td><b>ID</b></td><td>译码 + 读寄存器堆，一拍内必完成</td><td class="mono">恒为 1</td></tr>
+<tr><td><b>EXE</b></td><td>当前所有指令一拍就能算完</td><td class="mono">恒为 1</td></tr>
+<tr><td><b>MEM</b></td><td>只从数据 RAM 取数，数据 RAM 一定可以返回</td><td class="mono">恒为 1</td></tr>
+<tr><td><b>WB</b></td><td>写回寄存器堆，一拍内必完成</td><td class="mono">恒为 1</td></tr>
+</tbody>
+</table>
+
+<div class="box warn">
+<b>把这段话翻译成人话</b>：教材让你把 RAM 当成一个<b>「延迟固定为 1 拍、而且永远不会让你多等」</b>的东西。<br>
+注意它不是"不用等"，而是<b>"要等多久是已知的，所以能被流水线的时间表直接吸收掉"</b>——
+反正 IF 级本来就占一整拍，正好拿来等 RAM。<br>
+这就解释了回头看 §2 时会产生的困惑：<b>为什么第 1 章里五级 <code>ready_go</code> 全是常数 1，握手信号好像"没起作用"？</b>
+因为在这一章的假设下，它确实还没到发挥作用的时候。
+</div>
+
+<h4>④ 因此你的代码只需要做两件事</h4>
+
+<pre><code><span class="cmt">// ① 请求：这一拍给出地址和片选</span>
+<span class="kw">assign</span> inst_sram_en   = to_fs_valid &amp;&amp; fs_allowin;   <span class="cmt">// 片选</span>
+<span class="kw">assign</span> inst_sram_addr = next_pc;                      <span class="cmt">// 地址</span>
+
+<span class="cmt">// ② 响应：下一拍直接取，不用判 ready、不用等、不用重试</span>
+<span class="kw">assign</span> fs_inst        = inst_sram_rdata;</code></pre>
+
+<p>没有状态机，没有"等待 RAM 就绪"的分支，没有重试计数。
+<b>这正是教材希望你体会的东西</b>：片上 block RAM 的访问延迟是<b>确定的</b>，所以流水线可以做得非常干净。</p>
+
+<h4>⑤ 两个「为什么」</h4>
+
+<p><b>为什么非要加片选 <code>en</code>？</b>因为从这一章开始 RAM 换成了 block RAM（不再是简单的寄存器堆），
+它带 <code>ena</code> 端口，<code>en=0</code> 时 RAM 不动作、输出保持不变。
+更重要的是，片选决定了<b>这一次访问算不算数</b>：IF 被堵住时把片选拉低，才能避免白读一次（详见 5.2）。</p>
+
+<p><b>为什么 <code>we</code> 要从 1 位改成 4 位？</b>指导书写得很明确：</p>
+
+<div class="quote">
+<p>尽管目前存数指令仅实现了 st.w，但考虑到后续实践任务的需求，
+myCPU 顶层接口中的 inst_sram_we 和 data_sram_we 都从 1 比特改为 4 比特，
+其含义也从 RAM 的写使能调整为 <b>RAM 的字节写使能</b>。</p>
+<span class="src">——《计算机组成原理实验指导书》1.5</span>
+</div>
+
+<p class="small">这是典型的<b>为将来预留</b>：第 1 章只有 <code>st.w</code>（一次写整个字），
+但第 4 章要加 <code>st.b</code> / <code>st.h</code>，必须能只写某一个字节、某半个字。
+要是当初没做这个改动，到第 4 章就得回头把所有接口推倒重来。</p>
+
+<h4>⑥ 这个假设什么时候会破？</h4>
+
+<p>一旦存储器<b>不再是「固定 1 拍必回」</b>，五级 <code>ready_go</code> 恒为 1 就不成立了。
+你的工程里正好留着另外几个 SoC 变体，可以拿来对照：</p>
+
+<table>
+<thead><tr><th style="width:120px">SoC 变体</th><th style="width:140px">存储器</th><th>访问特性与后果</th></tr></thead>
+<tbody>
+<tr><td class="mono">soc_bram</td><td>片内 block RAM</td><td>延迟<b>固定 1 拍</b> → ready_go 可以恒为 1（<b>本课设用的就是这个</b>）</td></tr>
+<tr><td class="mono">soc_axi</td><td>AXI 总线</td><td>延迟<b>不确定</b>，必须等 <code>ready</code> → 这里才需要真正的握手</td></tr>
+<tr><td class="mono">soc_dram</td><td>外部 BaseRAM</td><td>低电平有效、地址取 <code>[21:2]</code>，需要 <code>BaseRAM_control</code> 做协议转换</td></tr>
+</tbody>
+</table>
+
+<div class="box ask">
+<b>老师可能会追问</b>："如果换成 AXI 或者外部 RAM，你的流水线要改什么？"<br>
+答：<b>CPU 主体不用改，只改两处</b>——① 各级 <code>ready_go</code> 不能再恒为 1，
+要加入"等存储器返回"的逻辑（这时阻塞才会沿 <code>allowin</code> 一级级往回传，§2 那套握手才真正开始干活）；
+② 顶层接口从类 SRAM 换成 AXI 通道，或者加一个桥接模块做协议转换。<br>
+这正是"把 CPU 和存储器分开设计"换来的好处——换存储器件不用动流水线核心。
+</div>
+
+<h4>⑦ 一句话总结（背这句就够）</h4>
+
+<div class="box ok">
+教材给你的 RAM 使用模型是：<b>片内 block RAM ＋ 类 SRAM 接口 ＋ 固定 1 拍返回</b>。<br>
+你只需要「当拍发出片选和地址、下一拍取走数据」，<b>不需要写任何等待逻辑</b>，
+因此第 1 章里五级 <code>ready_go</code> 全部恒为 1。<br>
+等到存储器延迟不再确定（AXI / 外部 RAM）时，§2 那套握手机制才真正派上用场。
+</div>
+
 <h3>5.1 CPU 看到的 RAM 接口（6 个信号）</h3>
 
 <table>
@@ -706,6 +895,200 @@ ID 这一拍收不到东西（<code>fs_to_ds_valid=0</code>），下一拍 IF �
 
 <p class="small">这个"差一拍"是所有同步 BRAM 的共同特征。你可以在仿真波形里验证它：
 <code>inst_sram_addr</code> 变化后的<b>下一个</b>时钟沿，<code>inst_sram_rdata</code> 才跟着变。</p>
+
+<!-- ---------- §5.7 实操 ---------- -->
+<h3>5.7 实操：怎么让 Vivado 用上老师给的 RAM（手把手）</h3>
+
+<p>前面讲的都是原理。这一节回答一个非常具体的问题：
+<b>老师已经把 RAM 做好了，我该怎么做才能让我的 Vivado 工程真正用上它？</b>
+整个过程的本质是——<b>你不用造 RAM，只要让 Vivado 认识它、把它和 CPU 连起来、再把程序装进去。</b></p>
+
+<h4>① 先看清老师给了你什么</h4>
+
+<pre><code>soc_verify/soc_bram/
+├── rtl/
+│   ├── soc_lite_top.v              <span class="cmt">← SoC 顶层：把 CPU 和 RAM 接起来（老师写好）</span>
+│   ├── BRIDGE/bridge_1x2.v         <span class="cmt">← 数据地址译码，决定访问 RAM 还是外设</span>
+│   ├── CONFREG/confreg.v           <span class="cmt">← 数码管 / 拨码开关等外设</span>
+│   └── xilinx_ip/                  <span class="cmt">← ★ RAM 就在这里</span>
+│       ├── inst_ram/inst_ram.xci   <span class="cmt">← IP 的"身份证"（唯一真相）</span>
+│       ├── data_ram/data_ram.xci
+│       └── clk_pll/clk_pll.xci
+├── testbench/
+│   ├── mycpu_tb.v                  <span class="cmt">← 测试台</span>
+│   └── sync_ram.v                  <span class="cmt">← ★ 仿真用的行为级 RAM</span>
+├── run_vivado/
+│   ├── create_project.tcl          <span class="cmt">← ★ 建工程脚本，关键就在这里</span>
+│   └── constraints/soc_lite_top.xdc
+└── project/                        <span class="cmt">← 你跑完脚本后自动生成</span></code></pre>
+
+<div class="box note">
+<b>一个重要的认知</b>：<code>xilinx_ip/</code> 里除了 <code>.xci</code> 之外，
+<code>hdl/</code>、<code>simulation/</code>、<code>*_sim_netlist.v</code> 等等<b>全是 Vivado 自动生成的</b>。
+它们随时可以被重新生成，<b>你不要去改，改了也会被下一次 generate 覆盖</b>。
+真正需要你关心的只有 <code>.xci</code> 这一个文件。
+</div>
+
+<h4>② 第 1 步：建工程（一条命令）</h4>
+
+<pre><code><span class="cmt"># 进入那个目录，然后：</span>
+cd cdp_ede_local-master/mycpu_env/soc_verify/soc_bram/run_vivado
+vivado -mode batch -source create_project.tcl</code></pre>
+
+<p>这个脚本很短，但每一行都有讲究：</p>
+
+<pre><code>create_project -force loongson ./project -part xc7a200tfbg676-1
+
+<span class="cmt"># 普通源码：SoC 顶层 + BRIDGE/CONFREG 子目录</span>
+add_files -scan_for_includes [glob -nocomplain ../rtl/*.v]
+add_files -scan_for_includes [glob -nocomplain ../rtl/*/*.v]
+
+<span class="cmt"># ★★ 就是这一行，让 Vivado 认识老师的 RAM ★★</span>
+add_files -quiet [glob -nocomplain ../rtl/xilinx_ip/*/*.xci]
+
+<span class="cmt"># 仿真文件（含 sync_ram.v）</span>
+add_files -fileset sim_1 ../testbench
+
+<span class="cmt"># ★ 你的 CPU 源码</span>
+add_files -scan_for_includes ../../../myCPU
+
+<span class="cmt"># 约束</span>
+add_files -fileset constrs_1 -quiet ./constraints
+
+<span class="cmt"># 仿真顶层是 tb_top（不是 soc_lite_top）</span>
+set_property -name "top" -value "tb_top" -objects [get_filesets sim_1]</code></pre>
+
+<div class="box ok">
+<b>这行是全部秘密</b>：<code>add_files [glob ../rtl/xilinx_ip/*/*.xci]</code><br>
+在 Vivado 里，<code>.xci</code> 是 IP 的<b>定义文件</b>。只要你把它加进工程，
+Vivado 就认识了 <code>inst_ram</code> / <code>data_ram</code> / <code>clk_pll</code> 这三个模块，
+之后顶层里直接 <code>inst_ram inst_ram(...)</code> 例化就行。<br>
+<b>注意加的是 .xci，不是 hdl/*.v。</b>后者由 Vivado 自己从 .xci 生成。
+</div>
+
+<h4>③ 第 2 步：让 IP 变成可用的网表</h4>
+
+<p>刚加进来的 IP 在 Vivado 里状态是 <b>locked</b>（还没生成实体）。要让它"落地"：</p>
+
+<pre><code><span class="cmt"># Tcl 方式</span>
+generate_target all [get_ips]
+<span class="cmt"># 或 GUI：Sources 面板 → IP Sources → 右键 inst_ram → Generate Output Products</span></code></pre>
+
+<p>执行后 Vivado 会生成 <code>xilinx_ip/inst_ram/hdl/inst_ram.v</code> 等文件——<b>这才是真正参与综合的代码</b>。</p>
+
+<div class="box warn">
+<b>什么时候必须重新做这一步？</b>
+<ul>
+<li>第一次建工程</li>
+<li><b>换了程序（改了 .coe / .mif）之后</b> ← 最容易忘</li>
+<li>Vivado 提示 "IP is locked" / 目录里 IP 图标带锁</li>
+</ul>
+</div>
+
+<h4>④ 第 3 步：看懂顶层是怎么接线的</h4>
+
+<p>接线是<b>老师已经写好</b>的，在 <code>soc_lite_top.v</code> 里。你要做的是<b>保证自己的 CPU 端口名对得上</b>：</p>
+
+<pre><code><span class="cmt">// ① CPU 例化（你的代码）</span>
+mycpu_top cpu(
+    .clk         (cpu_clk   ),
+    .resetn      (cpu_resetn),
+    .inst_sram_en   (cpu_inst_en   ),   .inst_sram_we   (cpu_inst_we   ),
+    .inst_sram_addr (cpu_inst_addr ),   .inst_sram_wdata(cpu_inst_wdata),
+    .inst_sram_rdata(cpu_inst_rdata),
+    .data_sram_en   (cpu_data_en   ),   .data_sram_we   (cpu_data_we   ),
+    .data_sram_addr (cpu_data_addr ),   .data_sram_wdata(cpu_data_wdata),
+    .data_sram_rdata(cpu_data_rdata),
+    .debug_wb_pc(debug_wb_pc), .debug_wb_rf_we(debug_wb_rf_we),
+    .debug_wb_rf_wnum(debug_wb_rf_wnum), .debug_wb_rf_wdata(debug_wb_rf_wdata)
+);
+
+<span class="cmt">// ② 指令 RAM：CPU 直连</span>
+inst_ram inst_ram(
+    .clka  (cpu_clk            ),
+    .ena   (cpu_inst_en        ),   <span class="cmt">// ← 片选直接来自 CPU</span>
+    .wea   (cpu_inst_we        ),   <span class="cmt">// 4 位，指令 RAM 恒为 4'h0</span>
+    .addra (cpu_inst_addr[19:2]),   <span class="cmt">// ★ 字节地址 → 字地址</span>
+    .dina  (cpu_inst_wdata     ),
+    .douta (cpu_inst_rdata     )
+);
+
+<span class="cmt">// ③ 数据侧：CPU → bridge（按地址片选）→ data_ram 或 confreg</span>
+bridge_1x2 bridge_1x2(
+    .cpu_data_en(cpu_data_en), .cpu_data_addr(cpu_data_addr), ...
+    .data_sram_en(data_sram_en), .conf_en(conf_en), ...
+);
+data_ram data_ram(
+    .ena(data_sram_en), .addra(data_sram_addr[17:2]), ...
+);</code></pre>
+
+<div class="box ask">
+<b>你的"契约"只有这一条</b>：<code>mycpu_top</code> 的端口必须正好是
+<b>10 个 sram 信号 + 4 个 debug 信号 + clk/resetn</b>，名字一字不差。
+只要名字对得上，老师那套 RAM 就能直接用。<span class="cmt">（对照 myCPU/mycpu_head.v 第 3 行起的端口定义）</span>
+</div>
+
+<h4>⑤ 第 4 步：把程序装进 RAM</h4>
+
+<table>
+<thead><tr><th style="width:80px">场景</th><th style="width:200px">RAM 实体是谁</th><th>程序从哪来</th><th style="width:150px">换程序怎么做</th></tr></thead>
+<tbody>
+<tr><td><b>仿真</b></td><td><code>testbench/sync_ram.v</code><br>里的行为级 <code>inst_ram</code></td>
+    <td><code>$readmemb("…/func/obj/inst_ram.mif")</code></td><td>换 <code>.mif</code>，立刻生效</td></tr>
+<tr><td><b>上板</b></td><td><code>xilinx_ip/inst_ram</code><br>IP → 256 个 RAMB36E1</td>
+    <td>IP 属性 <code>Coe_File</code><br>→ <code>func/obj/inst_ram.coe</code></td><td>换 <code>.coe</code> <b>且必须重跑 OOC 综合</b></td></tr>
+</tbody>
+</table>
+
+<h4>⑥ 为什么仿真和上板不是同一个 RAM？</h4>
+
+<p>这是最反直觉的一点。<code>sync_ram.v</code> 里<b>故意</b>定义了和 IP 一模一样的模块名：</p>
+
+<pre><code><span class="kw">module</span> inst_ram #(...)( <span class="cmt">// 与 Xilinx IP 完全同名</span>
+    input clka, ena, [3:0] wea, [ADDR_WIDTH-1:0] addra,
+    input [31:0] dina, output [31:0] douta
+);
+    sync_ram #(...) sync_ram(.clk(clka), .address(addra), .rdata(douta),
+                             .wdata(dina), .we(wea), .en(ena));
+    <span class="kw">initial</span> <span class="kw">begin</span>
+        $readmemb(<span class="sig">"../../../../../../../../func/obj/inst_ram.mif"</span>, sync_ram.ram);
+    <span class="kw">end</span>
+<span class="kw">endmodule</span></code></pre>
+
+<p>Vivado 编译时发现<b>两个同名模块</b>，会报 <code>VRFC 10-3609</code>（模块重定义），
+并且<b>采用后编译的那个</b>。因为 <code>testbench/</code> 是后面加的，所以行为级版本<b>覆盖</b>了 IP 网表。</p>
+
+<div class="box note">
+<b>那个 8 层 <code>../</code> 是怎么算出来的？</b><br>
+仿真的当前工作目录是 <code>project/loongson.sim/sim_1/behav/xsim/</code>，从它往上数 8 层：
+<pre style="margin:8px 0 0"><code>xsim → behav → sim_1 → loongson.sim → project
+     → run_vivado → soc_bram → soc_verify → mycpu_env</code></pre>
+正好落在 <code>mycpu_env/</code>，于是 <code>func/obj/inst_ram.mif</code> 就找到了。
+<b>这就是为什么这个路径不能随便改</b>——它是被仿真目录深度"钉死"的。
+</div>
+
+<h4>⑦ 三个一定会踩的坑</h4>
+
+<table>
+<thead><tr><th style="width:44px">#</th><th style="width:190px">坑</th><th>后果与正确做法</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>换程序只换了 <code>.coe</code>，没重跑 OOC 综合</td>
+    <td><b>bit 里固化的还是旧程序</b>，上板跑的是上一章的内容（仿真却是对的）。
+    必须 <code>reset_run</code> + <code>launch_runs inst_ram_synth_1</code></td></tr>
+<tr><td>2</td><td>以为 <code>generate_target</code> 就够了</td>
+    <td>它只会更新 IP 目录里的文件，<b>不会重跑 OOC 综合</b>；
+    只敲 <code>reset_run synth_1</code> 还会被判定 "already up-to-date" 跳过</td></tr>
+<tr><td>3</td><td>手动改 <code>xilinx_ip/*/hdl/</code> 里的文件</td>
+    <td>下次 generate 会被<b>全部覆盖</b>，白改。要改就改 <code>.xci</code> 的属性或源镜像</td></tr>
+</tbody>
+</table>
+
+<div class="box ok">
+<b>三句话自检</b>：<br>
+① 我的 <code>mycpu_top</code> 端口名和 <code>soc_lite_top.v</code> 里的例化<b>完全一致</b>吗？<br>
+② IP 是不是已经 <code>generate_target</code> 过（图标不带锁）？<br>
+③ 换过程序的话，<code>inst_ram_synth_1</code> 有没有<b>重新跑过</b>？
+</div>
 
 <!-- ======================= §6 ======================= -->
 <h2 id="s6">6 · 第 2 章 · 数据前递与 Load-Use 阻塞</h2>
@@ -876,7 +1259,7 @@ add.w $r6, $r0, $r7    <span class="cmt">// $r0 必须读到 0</span></code></pr
 若不加 <code>ds_use_rkd</code> 判断，会：</p>
 <ul>
 <li><b>误前递</b>：<code>rkd_value</code> 被换成别的值（多数情况下因为 <code>src2_is_imm</code> 用不到它而无害，但很脏）；</li>
-<li><b>误阻塞</b>：<code>load_stall</code> 无谓拉高 → <b>白白损失一个周期</b>（性能问题，不是功能问题）。</p>
+<li><b>误阻塞</b>：<code>load_stall</code> 无谓拉高 → <b>白白损失一个周期</b>（性能问题，不是功能问题）。</li>
 </ul>
 <div class="box ok">
 <b>本工程的写法</b>：显式列出每条指令"到底用不用 rj / rkd"，得到 <code>ds_use_rj</code> 和 <code>ds_use_rkd</code>，

@@ -19,6 +19,12 @@ set OUTDIR  "D:/Courses/Computer_organization_design/Main_project_1.1/.workbuddy
 puts "===== 目标：EXP$EXP 的 bitstream ====="
 open_project $PROJECT
 
+# 同步 myCPU 源文件：工程原始脚本用"目录"方式 add_files，之后新增的 .v
+# （例如第 6 章的 csr.v）不会被自动发现，会导致综合报 Module not found。
+foreach f [glob -nocomplain "D:/Courses/Computer_organization_design/Main_project_1.1/cdp_ede_local-master/mycpu_env/myCPU/*.v"] {
+    add_files -scan_for_includes -norecurse $f
+}
+
 # 顶层必须仍为 looongson_remote_top（3 个 o 为官方拼写）
 puts "TOP: [get_property TOP [get_filesets sources_1]]"
 
@@ -95,8 +101,14 @@ foreach b $bit {
     file copy -force $b $root
     puts "ROOT-BIT: $root"
 }
-file copy -force $OUTDIR/timing_exp${EXP}.rpt "$ARCH/" 2>/dev/null
-file copy -force $OUTDIR/util_exp${EXP}.rpt   "$ARCH/" 2>/dev/null
+# 注意：Tcl 里不能写 "2>/dev/null"（那是 shell 语法），否则会把 "2>/dev/null"
+# 当成目标目录而报 "target ... is not a directory"，导致脚本在 bit 已生成后仍报错退出。
+if {[file exists $OUTDIR/timing_exp${EXP}.rpt]} {
+    file copy -force $OUTDIR/timing_exp${EXP}.rpt "$ARCH/"
+}
+if {[file exists $OUTDIR/util_exp${EXP}.rpt]} {
+    file copy -force $OUTDIR/util_exp${EXP}.rpt "$ARCH/"
+}
 
 puts "REBUILD_EXP${EXP}_DONE"
 close_project

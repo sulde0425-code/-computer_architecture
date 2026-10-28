@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LA32R 五级流水线处理器 · 第 5 章讲义（实验三·上）</title>
+<style>
+  :root{
+    --ink:#2C2C2A; --ink2:#5F5E5A; --ink3:#888780;
+    --line:#E3E1DA; --line2:#D3D1C7;
+    --bg:#FFFFFF; --bg2:#F7F6F2; --bg3:#F1EFE8;
+    --blue:#185FA5; --blue-bg:#E6F1FB;
+    --teal:#0F6E56; --teal-bg:#E1F5EE;
+    --amber:#854F0B; --amber-bg:#FAEEDA;
+    --purple:#534AB7; --purple-bg:#EEEDFE;
+    --red:#A32D2D; --red-bg:#FCEBEB;
+    --green:#3B6D11; --green-bg:#EAF3DE;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg3);color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       font-size:14.5px;line-height:1.75}
+  .wrap{max-width:940px;margin:0 auto;padding:32px 24px 80px}
+  header{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:28px 30px;margin-bottom:22px}
+  h1{margin:0 0 8px;font-size:23px;font-weight:600;letter-spacing:.3px}
+  .sub{color:var(--ink2);font-size:13.5px;margin:0}
+  h2{font-size:19px;font-weight:600;margin:34px 0 14px;padding-top:18px;border-top:1px solid var(--line2)}
+  h2:first-of-type{border-top:none;padding-top:0}
+  h3{font-size:16px;font-weight:600;margin:24px 0 10px}
+  h4{font-size:14.5px;font-weight:600;margin:18px 0 8px;color:var(--ink)}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;font-size:12.8px;
+       background:var(--bg3);padding:1px 5px;border-radius:4px;color:#3C3489}
+  pre{background:#FBFAF7;border:1px solid var(--line);border-left:3px solid var(--blue);
+      border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:12.8px;line-height:1.65;margin:12px 0}
+  pre code{background:none;padding:0;color:var(--ink);font-size:12.8px}
+  .cmt{color:#7A786F}
+  .kw{color:#993C1D;font-weight:600}
+  .sig{color:#185FA5;font-weight:600}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.2px;background:var(--bg)}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--bg3);font-weight:600;white-space:nowrap}
+  td.mono,th.mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:12.3px}
+  .box{border-radius:12px;padding:14px 18px;margin:16px 0;border:1px solid var(--line);background:var(--bg)}
+  .note{background:var(--blue-bg);border-color:#B5D4F4}
+  .warn{background:var(--amber-bg);border-color:#EF9F27}
+  .dang{background:var(--red-bg);border-color:#F09595}
+  .ok{background:var(--green-bg);border-color:#97C459}
+  .ask{background:var(--purple-bg);border-color:#AFA9EC}
+  .box b{font-weight:600}
+  .box p:first-child{margin-top:0}.box p:last-child{margin-bottom:0}
+  /* 位域排线图 */
+  .bits{display:flex;flex-wrap:wrap;gap:3px;margin:10px 0 6px;font-family:"SFMono-Regular",Consolas,monospace}
+  .bf{border:1px solid var(--line2);border-radius:4px;padding:4px 6px;font-size:11.4px;
+      background:var(--bg2);text-align:center;min-width:52px}
+  .bf .n{display:block;font-weight:600;color:var(--ink);font-size:11.8px}
+  .bf .r{display:block;color:var(--ink3);font-size:10.4px}
+  .bf.c1{background:var(--blue-bg);border-color:#85B7EB}
+  .bf.c2{background:var(--teal-bg);border-color:#5DCAA5}
+  .bf.c3{background:var(--amber-bg);border-color:#EF9F27}
+  .bf.c4{background:var(--purple-bg);border-color:#AFA9EC}
+  .bf.c5{background:var(--red-bg);border-color:#F09595}
+  .bf.c6{background:var(--green-bg);border-color:#97C459}
+  .bf.c0{background:#F1EFE8;border-color:#B4B2A9}
+  .fig{margin:18px 0;padding:14px;background:var(--bg);border:1px solid var(--line);border-radius:12px}
+  .fig svg{width:100%;height:auto;display:block}
+  .cap{font-size:12.4px;color:var(--ink3);margin-top:8px;text-align:center}
+  .tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:20px;
+       background:var(--bg3);color:var(--ink2);border:1px solid var(--line2);margin-right:4px}
+  .tag.ch5{background:var(--amber-bg);color:var(--amber);border-color:#EF9F27}
+  .tag.new{background:var(--green-bg);color:var(--green);border-color:#97C459}
+  .toc{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 22px}
+  .toc ol{margin:6px 0;padding-left:20px}
+  .toc a{color:var(--blue);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13.4px;margin:10px 0}
+  .kv .k{color:var(--ink2);white-space:nowrap}
+  hr{border:none;border-top:1px solid var(--line);margin:26px 0}
+  .center{text-align:center}
+  .small{font-size:12.8px;color:var(--ink2)}
+  .quote{border-left:3px solid var(--purple);background:var(--purple-bg);border-radius:0 10px 10px 0;
+         padding:12px 18px;margin:12px 0;font-size:13.2px;line-height:1.72}
+  .quote p{margin:6px 0}
+  .quote .src{display:block;font-size:12px;color:var(--ink3);margin-top:8px}
+  /* 三卡并列 */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card .t{font-weight:600;font-size:13.6px;margin-bottom:6px}
+  .card .d{font-size:12.8px;color:var(--ink2);line-height:1.65}
+  .card.b{border-top:3px solid var(--blue)} .card.b .t{color:var(--blue)}
+  .card.a{border-top:3px solid var(--amber)} .card.a .t{color:var(--amber)}
+  .card.g{border-top:3px solid var(--green)} .card.g .t{color:var(--green)}
+  @media(max-width:760px){.cards{grid-template-columns:1fr}}
+  @media print{body{background:#fff}.wrap{padding:0}h2{page-break-after:avoid}.fig,table,.box{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>LA32R 五级流水线处理器 · 第 5 章讲义（实验三·上）</h1>
+  <p class="sub">面向"计组基础薄弱、但要上台汇报"的同学 · 所有代码与信号均取自你工程里的真实 RTL<br>
+  对应指导书：第 5 章「乘除类指令的添加」　·　对应评测：<b>EXP7</b></p>
+</header>
+
+<div class="toc">
+  <b>目录</b>
+  <ol>
+    <li><a href="#s0">学前预备：这一章为什么和前面不一样</a></li>
+    <li><a href="#s1">七条乘除指令：编码、语义、三个"对偶"</a></li>
+    <li><a href="#s2">乘法器：一行 <code>*</code> 就够，但必须放在对的地方</a></li>
+    <li><a href="#s3">除法器：32 拍迭代的恢复余数法</a></li>
+    <li><a href="#s4">流水线视角：多拍指令带来的三类问题</a></li>
+    <li><a href="#s5">EXP7 测了什么（n30–n36 测试点全表）</a></li>
+    <li><a href="#s6">我们的工程：为这一章具体改了什么</a></li>
+    <li><a href="#s7">怎么验证 + 本项目实测结果</a></li>
+    <li><a href="#s8">汇报要点与老师常问的 8 个问题</a></li>
+  </ol>
+</div>
+
+<!-- ======================= §0 ======================= -->
+<h2 id="s0">0 · 学前预备：这一章为什么和前面不一样</h2>
+
+<p>前两份讲义（第 1–2 章、第 3–4 章）讲的是"在已有骨架上<b>填指令</b>"——
+13 条算逻、4 条转移、6 条访存，<code>alu.v</code> 一行都没改，全部靠复用。
+这一章不一样：<b>第一次真正往 CPU 里加运算部件</b>。</p>
+
+<div class="cards">
+  <div class="card b">
+    <div class="t">实验一（第 1–2 章）</div>
+    <div class="d">搭骨架：五级划分、握手规范、级间总线、前递与阻塞。<br>关键词：<b>结构</b></div>
+  </div>
+  <div class="card a">
+    <div class="t">实验二（第 3–4 章）</div>
+    <div class="d">填指令：9 条算逻 + 4 条转移 + 6 条访存，<b>零新增部件</b>。<br>关键词：<b>复用</b></div>
+  </div>
+  <div class="card g">
+    <div class="t">实验三上（第 5 章·本册）</div>
+    <div class="d">加部件：1 个 DSP48 乘法器 + 2 个 32 拍除法器。<br>关键词：<b>时序与多拍</b></div>
+  </div>
+</div>
+
+<div class="box ok">
+<b>本课最核心的一句话（请背下来，汇报时第一句就说它）</b><br>
+第 5 章真正难的地方<b>不是算术</b>——LA32R 只要求 32 位整数乘除，Verilog 一行 <code>*</code> 就能出乘法，
+除法也是一个教科书算法。难的是<b>把这两个部件塞进五级流水线而不破坏它</b>：
+<ul style="margin:8px 0 0">
+<li><b>乘法器太快、太大</b>——它是组合逻辑，一旦被并进 <code>alu_result</code> 的锥里，
+就会顺着前递链路串到"分支比较 → 取指地址"，形成跨三级的长路径，50&nbsp;MHz 直接不收敛；</li>
+<li><b>除法器太慢</b>——一次除法要 32 个时钟，而流水线默认每一级都是 1 拍，
+必须给它加"允许占住本级多拍"的握手通道。</li>
+</ul>
+这两个问题一个关于<b>空间</b>（放在哪），一个关于<b>时间</b>（等多久），构成本章的全部难点。
+</div>
+
+<h3>0.1 三张清单：这一章总共就加了这些东西</h3>
+
+<table>
+<thead><tr><th style="width:140px">维度</th><th>第 5 章新增</th></tr></thead>
+<tbody>
+<tr><td><b>指令</b></td>
+    <td><code>mul.w</code>、<code>mulh.w</code>、<code>mulh.wu</code>、<code>div.w</code>、<code>div.wu</code>、<code>mod.w</code>、<code>mod.wu</code>（<b>7 条</b>）</td></tr>
+<tr><td><b>ALU 运算</b></td>
+    <td><b>无</b>——<code>alu.v</code> 依旧一行没改，<code>alu_op[12..14]</code> 只是"借道传输的标签"，ALU 内部不使用</td></tr>
+<tr><td><b>新增硬件</b></td>
+    <td>① 组合乘法器（Vivado 映射到 <b>DSP48</b>，单周期）<br>
+        ② <code>divider.v</code>：32 拍恢复余数除法器，例化<b>两份</b>（有符号 / 无符号）</td></tr>
+<tr><td><b>新增信号</b></td>
+    <td><code>ds_div_en</code> / <code>ds_div_signed</code> / <code>ds_div_rem</code>（3 位，走 ID→EXE）<br>
+        <code>es_is_div</code> / <code>es_div_ready</code> / <code>es_is_mul</code>（EXE→ID 反向）</td></tr>
+<tr><td><b>新增阻塞</b></td>
+    <td><code>div_stall</code>、<code>mul_stall</code>、<code>branch_load_stall</code>（时序修复的副产品）</td></tr>
+</tbody>
+</table>
+
+<p>指导书对本章的定位说得很清楚：</p>
+
+<div class="quote">
+<p>■ 添加整数乘除类指令 mul.w、mulh.w、mulh.wu、div.w、div.wu、mod.w、mod.wu，
+运行对应的 func，要求成功通过仿真和上板验证。</p>
+<p>■ 对于乘法，可以采用乘加的方式实现，也可以直接使用 Verilog 的乘号实现；
+对于除法，建议调用 Xilinx 的 Divider Generator IP 核（Radix2 算法）。</p>
+<span class="src">——《计算机组成原理实验指导书》第 5 章 开篇</span>
+</div>
+
+<div class="box note">
+<b>关于"用不用 IP"：</b>本工程<b>没有调用 Divider Generator IP</b>，
+而是用纯 Verilog 写了一个<b>接口完全对齐 Divider Generator 的除法器</b>（<code>divider.v</code>，146 行）。
+好处有三个：
+① 不依赖 IP 工程，任何机器上 clone 下来就能仿真；
+② 端口名（<code>s_axis_dividend_tvalid</code> 等）与官方一致，
+<b>将来想换回 IP 只改例化，EXE 级一动不动</b>；
+③ 讲解汇报时能把算法讲透——"我调了个 IP"是讲不出细节的。
+</div>
+
+<!-- ======================= §1 ======================= -->
+<h2 id="s1">1 · 七条乘除指令：编码、语义、三个"对偶"</h2>
+
+<h3>1.1 编码：和移位指令同一个"大家族"</h3>
+
+<p>这 7 条都是 <b>3R 格式</b>（<code>rd, rj, rk</code>，无立即数）：<code>op[31:26]=0x00</code>、
+<code>op[25:22]=0x0</code>。它们内部靠 <code>op[21:20]</code> 分成两族，再用 <code>op[19:15]</code> 区分具体指令：</p>
+
+<table>
+<thead><tr><th class="mono" style="width:100px">指令</th><th class="mono" style="width:96px">[31:26]</th><th class="mono" style="width:86px">[25:22]</th><th class="mono" style="width:86px">[21:20]</th><th class="mono" style="width:96px">[19:15]</th><th>语义</th></tr></thead>
+<tbody>
+<tr><td class="mono"><b>mul.w</b></td><td class="mono">0x00</td><td class="mono">0x0</td><td class="mono">0x1</td><td class="mono">0x18</td><td>rd ← (rj × rk)[31:0]</td></tr>
+<tr><td class="mono"><b>mulh.w</b></td><td class="mono">0x00</td><td class="mono">0x0</td><td class="mono">0x1</td><td class="mono">0x19</td><td>rd ← 有符号乘积[63:32]</td></tr>
+<tr><td class="mono"><b>mulh.wu</b></td><td class="mono">0x00</td><td class="mono">0x0</td><td class="mono">0x1</td><td class="mono">0x1a</td><td>rd ← 无符号乘积[63:32]</td></tr>
+<tr><td class="mono"><b>div.w</b></td><td class="mono">0x00</td><td class="mono">0x0</td><td class="mono">0x2</td><td class="mono">0x00</td><td>rd ← 有符号商</td></tr>
+<tr><td class="mono"><b>mod.w</b></td><td class="mono">0x00</td><td class="mono">0x0</td><td class="mono">0x2</td><td class="mono">0x01</td><td>rd ← 有符号余数</td></tr>
+<tr><td class="mono"><b>div.wu</b></td><td class="mono">0x00</td><td class="mono">0x0</td><td class="mono">0x2</td><td class="mono">0x02</td><td>rd ← 无符号商</td></tr>
+<tr><td class="mono"><b>mod.wu</b></td><td class="mono">0x00</td><td class="mono">0x0</td><td class="mono">0x2</td><td class="mono">0x03</td><td>rd ← 无符号余数</td></tr>
+<tr><td class="mono small">sll.w（第3章）</td><td class="mono small">0x00</td><td class="mono small">0x0</td><td class="mono small">0x1</td><td class="mono small">0x0e</td><td class="small">对照：<b>移位与乘法同在 [21:20]=0x1 族</b></td></tr>
+</tbody>
+</table>
+
+<p>真实译码取自 <code>ID_stage.v</code>，<b>四个字段全部写满</b>：</p>
+
+<pre><code><span class="cmt">// ---- 第 5 章：乘除指令（均为 3R 格式，op[31:26]=000000、op[25:22]=0000）----</span>
+<span class="cmt">//   op[21:20]=01 → 乘法类：11000=mul.w  11001=mulh.w  11010=mulh.wu</span>
+<span class="cmt">//   op[21:20]=10 → 除法类：00000=div.w  00001=mod.w  00010=div.wu  00011=mod.wu</span>
+<span class="kw">assign</span> inst_mul_w   = op_31_26_d[<span class="sig">6'h00</span>] &amp; op_25_22_d[<span class="sig">4'h0</span>] &amp; op_21_20_d[<span class="sig">2'h1</span>] &amp; op_19_15_d[<span class="sig">5'h18</span>];
+<span class="kw">assign</span> inst_mulh_w  = op_31_26_d[<span class="sig">6'h00</span>] &amp; op_25_22_d[<span class="sig">4'h0</span>] &amp; op_21_20_d[<span class="sig">2'h1</span>] &amp; op_19_15_d[<span class="sig">5'h19</span>];
+<span class="kw">assign</span> inst_mulh_wu = op_31_26_d[<span class="sig">6'h00</span>] &amp; op_25_22_d[<span class="sig">4'h0</span>] &amp; op_21_20_d[<span class="sig">2'h1</span>] &amp; op_19_15_d[<span class="sig">5'h1a</span>];
+<span class="kw">assign</span> inst_div_w   = op_31_26_d[<span class="sig">6'h00</span>] &amp; op_25_22_d[<span class="sig">4'h0</span>] &amp; op_21_20_d[<span class="sig">2'h2</span>] &amp; op_19_15_d[<span class="sig">5'h00</span>];
+<span class="kw">assign</span> inst_mod_w   = op_31_26_d[<span class="sig">6'h00</span>] &amp; op_25_22_d[<span class="sig">4'h0</span>] &amp; op_21_20_d[<span class="sig">2'h2</span>] &amp; op_19_15_d[<span class="sig">5'h01</span>];
+<span class="kw">assign</span> inst_div_wu  = op_31_26_d[<span class="sig">6'h00</span>] &amp; op_25_22_d[<span class="sig">4'h0</span>] &amp; op_21_20_d[<span class="sig">2'h2</span>] &amp; op_19_15_d[<span class="sig">5'h02</span>];
+<span class="kw">assign</span> inst_mod_wu  = op_31_26_d[<span class="sig">6'h00</span>] &amp; op_25_22_d[<span class="sig">4'h0</span>] &amp; op_21_20_d[<span class="sig">2'h2</span>] &amp; op_19_15_d[<span class="sig">5'h03</span>];</code></pre>
+
+<div class="box warn">
+<b>★ 坑 1：乘法和移位是"同族兄弟"，译码必须写满四个字段。</b><br>
+<code>sll.w / srl.w / sra.w</code> 的编码是 <code>[21:20]=0x1</code> + <code>[19:15]=0x0e/0x0f/0x10</code>，
+和 <code>mul.w</code> 的 <code>[21:20]=0x1</code> + <code>[19:15]=0x18</code> 只差最后一个字段。
+如果偷懒少写 <code>op_21_20_d</code>（觉得"反正 [19:15] 不一样"），
+短期看不出问题，但只要以后再加一条 <code>[19:15]=0x18</code> 的其它族指令就会静默撞车。
+<b>规则：3R 指令的译码前缀一律写满 <code>op_31_26 / op_25_22 / op_21_20</code> 三段，再用 <code>op_19_15</code> 分流。</b>
+</div>
+
+<h3>1.2 三个"对偶"：把这 7 条压成 3 组来理解</h3>
+
+<p>七条指令看着多，其实只有三个维度上的"对偶"，每个维度只要一个控制位：</p>
+
+<table>
+<thead><tr><th style="width:120px">对偶</th><th style="width:120px">控制位</th><th>区别</th><th>实现代价</th></tr></thead>
+<tbody>
+<tr><td>低半 / 高半</td><td class="mono">alu_op[12] / [13] / [14]</td>
+    <td><code>mul.w</code> 取乘积 [31:0]；<code>mulh.w</code> / <code>mulh.wu</code> 取 [63:32]</td>
+    <td>一个 3 选 1 MUX</td></tr>
+<tr><td>有符号 / 无符号（乘）</td><td class="mono">alu_op[13] vs [14]</td>
+    <td>同一个 64 位乘积，一个来自 <code>$signed</code> 乘法，一个来自普通乘法</td>
+    <td>两个 <code>*</code> 表达式（共用 DSP48）</td></tr>
+<tr><td>商 / 余数</td><td class="mono">ds_div_rem</td>
+    <td>除法器<b>同时</b>输出商和余数（64 位：<code>[63:32]</code>=商，<code>[31:0]</code>=余数），<code>div</code> 取高半、<code>mod</code> 取低半</td>
+    <td>一个 2 选 1 MUX（<b>不用算两遍</b>）</td></tr>
+<tr><td>有符号 / 无符号（除）</td><td class="mono">ds_div_signed</td>
+    <td>决定用哪一个除法器实例</td>
+    <td>两份除法器 + 一个 MUX</td></tr>
+</tbody>
+</table>
+
+<div class="box ok">
+<b>这是一个可以直接讲的"省硬件"点：</b><code>div.w</code> 和 <code>mod.w</code> 在硬件上<b>共用同一次除法</b>。
+除法器一拍一拍算出来的商和余数是<b>同时</b>产生的（商逐位从低位补进 <code>quo_r</code>，
+余数就留在 <code>rem_r</code> 里），所以不存在"算两遍"的问题。
+把它们做成两条独立指令，只是为了让指令集写起来方便。
+</div>
+
+<h3>1.3 为什么 <code>mul.w</code> 与符号无关，而 <code>mulh</code> 必须区分</h3>
+
+<p>这是补码乘法最漂亮的一个性质：<b>乘积的低 32 位与"是否符号扩展"完全无关</b>，
+只有高 32 位不同。用工程里真实跑过的一组向量算一下就很清楚：</p>
+
+<table>
+<thead><tr><th style="width:190px">操作数</th><th class="mono" style="width:150px">乘积 [63:32]</th><th class="mono" style="width:150px">乘积 [31:0]</th><th>结论</th></tr></thead>
+<tbody>
+<tr><td class="mono">a = 0x99a451b0<br>b = 0xbe3d9998<br><span class="small">（按<b>有符号</b>乘）</span></td>
+    <td class="mono">0x1a4b01ae</td><td class="mono">0x8552b080</td><td rowspan="2">
+    <b>低半完全相同</b>（0x8552b080）<br>
+    <b>高半完全不同</b><br>
+    → <code>mul.w</code> 不需要知道符号<br>
+    → <code>mulh.w</code> / <code>mulh.wu</code> 必须分成两个表达式</td></tr>
+<tr><td class="mono">同一对操作数<br><span class="small">（按<b>无符号</b>乘）</span></td>
+    <td class="mono">0x722cecf6</td><td class="mono">0x8552b080</td></tr>
+</tbody>
+</table>
+
+<p>工程里的实现就是照这个性质写的——<b>算两个乘积，但只按需取半边</b>：</p>
+
+<pre><code><span class="kw">wire signed</span> [63:0] mul_signed_prod   = <span class="sig">$signed</span>(es_alu_src1) * <span class="sig">$signed</span>(es_alu_src2);
+<span class="kw">wire</span>        [63:0] mul_unsigned_prod = es_alu_src1 * es_alu_src2;
+
+<span class="kw">wire</span> [31:0] mul_result = alu_op[<span class="sig">12</span>] ? mul_unsigned_prod[<span class="sig">31:0</span>]  :  <span class="cmt">// mul.w  ：低半，符号无关</span>
+                          alu_op[<span class="sig">13</span>] ? mul_signed_prod  [<span class="sig">63:32</span>] :  <span class="cmt">// mulh.w ：有符号高半</span>
+                                       mul_unsigned_prod[<span class="sig">63:32</span>];   <span class="cmt">// mulh.wu：无符号高半</span></code></pre>
+
+<div class="box note">
+<b>为什么 <code>mul.w</code> 用的是 <code>mul_unsigned_prod[31:0]</code> 却没错？</b><br>
+因为低 32 位是"模 2<sup>32</sup>"意义下的结果，而 ×2<sup>32</sup> 的倍数对它没有影响——
+符号扩展只是在被乘数高位补 1，等价于多加了若干个 2<sup>32</sup> 的倍数。
+这也是为什么 <code>mul.w</code> <b>不会溢出、也不会报错</b>，它天生就是"截断"语义。
+</div>
+
+<p>用真实测试向量对照一下（<code>n32_mul_w.S</code> 与 <code>n33_mulh_w.S</code> 的第 1 行操作数完全一样）：</p>
+
+<pre><code><span class="cmt">// n32_mul_w.S   —— 取低半</span>
+TEST_MUL_W   (<span class="sig">0x45b90738</span>, <span class="sig">0xd70d64f0</span>, <span class="sig">0x0a20a480</span>)
+
+<span class="cmt">// n33_mulh_w.S  —— 同一对操作数，取有符号高半</span>
+TEST_MULH_W  (<span class="sig">0x45b90738</span>, <span class="sig">0xd70d64f0</span>, <span class="sig">0xf4d903bb</span>)</code></pre>
+
+<h3>1.4 除法语义：商向零取整，余数与被除数同号</h3>
+
+<p>LA32R（以及 C 语言）规定的是<b>"截断除法"</b>，不是数学上的 floor 除法：</p>
+
+<ul>
+<li><b>商</b>向零取整：<code>−7 / 2 = −3</code>（不是 −4）</li>
+<li><b>余数</b>符号<b>跟随被除数</b>：<code>−7 % 2 = −1</code>，<code>7 % −2 = 1</code></li>
+<li>永远满足 <code>被除数 = 除数 × 商 + 余数</code></li>
+</ul>
+
+<p>工程里真实通过的 4 组向量，<code>div.w</code>（n30）与 <code>mod.w</code>（n35）<b>操作数一一对应</b>，正好把这三条性质演示完：</p>
+
+<table>
+<thead><tr><th class="mono" style="width:96px">被除数</th><th class="mono" style="width:96px">除数</th><th class="mono" style="width:96px">div.w 商</th><th class="mono" style="width:96px">mod.w 余数</th><th>解读</th></tr></thead>
+<tbody>
+<tr><td class="mono">0x56bedfa4</td><td class="mono">0x20831400</td><td class="mono">0x00000002</td><td class="mono">0x15b8b7a4</td>
+    <td>两正数：<code>545461248×2 + 364427172 = 1455349668</code> ✓</td></tr>
+<tr><td class="mono">0x53eb4a70</td><td class="mono">0x07e13dd1</td><td class="mono">0x0000000a</td><td class="mono">0x051ee046</td>
+    <td>普通情况：商 10、余 85909574</td></tr>
+<tr><td class="mono">0x323676e0</td><td class="mono">0xdc3a3f10</td><td class="mono">0xffffffff</td><td class="mono">0x0e70b5f0</td>
+    <td><b>异号</b>：842430176 ÷ (−600162544) = −1.4 → 商 <b>−1</b>（向零）；
+        余数 = <b>+242267632</b>，<b>与被除数同号</b></td></tr>
+<tr><td class="mono">0xfda5ea8a</td><td class="mono">0xfac1873c</td><td class="mono">0x00000000</td><td class="mono">0xfda5ea8a</td>
+    <td><b>同负且 |a|&lt;|b|</b>：商 0，余数 = 被除数本身（负数）</td></tr>
+</tbody>
+</table>
+
+<div class="box warn">
+<b>★ 坑 2：如果你自己写除法器，最容易错的就是"负数"。</b><br>
+很多人的第一版会把 <code>−7 / 2</code> 算成 <code>−4</code>（floor），因为恢复余数法在绝对值域上算完以后，
+商的符号是<b>单独决定的</b>——你必须在最后一步补上"向零取整"的修正，否则差 1。
+本工程的做法是：<b>全部转到绝对值域算，最后再按符号取反</b>（见 §3.4），
+这样天然得到截断语义，不需要额外修正。
+</div>
+
+<!-- ======================= §2 ======================= -->
+<h2 id="s2">2 · 乘法器：一行 <code>*</code> 就够，但必须放在对的地方</h2>
+
+<h3>2.1 算法上零难度，工程上是本章最大的坑</h3>
+
+<p>指导书说"可以直接使用 Verilog 的乘号实现"，本工程就是这么做的——
+Vivado 会把 32×32 的 <code>*</code> 映射到 Artix-7 的 <b>DSP48E1</b> 硬核上，
+<b>几乎不消耗 LUT，单周期出结果</b>。所以乘法在"功能"层面是完全不用操心的。</p>
+
+<p>但如果你顺手把它并进 <code>alu.v</code> 的那棵"与-或树"里（毕竟独热码 12/13/14 三个位都留好了），
+<b>综合能过、仿真能过、RTL 逻辑也全对，唯独上板一定错</b>。这是本章最值得讲的故事。</p>
+
+<h3 id="s2b">2.2 ★ 时序灾难：乘法器为什么不能进 <code>alu_result</code></h3>
+
+<div class="fig">
+<svg viewBox="0 0 900 412" role="img" aria-label="乘法器放置位置对时序的影响">
+  <title>乘法器放置位置对时序的影响</title>
+  <desc>上：并进 ALU 与或树，乘法器被吸入前递逻辑锥，形成跨三级长路径 21~22ns；下：独立成 es_final_result 通路，只进 EXE 到 MEM 寄存器</desc>
+  <defs>
+    <marker id="arA" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+      <path d="M0,0 L8,3.2 L0,6.4 z" fill="#A32D2D"/></marker>
+    <marker id="arB" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+      <path d="M0,0 L8,3.2 L0,6.4 z" fill="#3B6D11"/></marker>
+  </defs>
+
+  <!-- ============ 上：错误做法 ============ -->
+  <rect x="18" y="16" width="864" height="180" rx="12" fill="#FCEBEB" stroke="#F09595" stroke-width="0.8"/>
+  <text x="38" y="42" font-size="13.4" font-weight="600" fill="#8A1F1F">✗ 做法 A：把乘法并进 alu.v 的「与-或树」</text>
+
+  <g font-size="11.5" text-anchor="middle">
+    <rect x="34" y="58" width="112" height="54" rx="8" fill="#FFFFFF" stroke="#F09595" stroke-width="0.6"/>
+    <text x="90" y="80" fill="#2C2C2A">乘法器</text>
+    <text x="90" y="99" fill="#5F5E5A">DSP48 级联</text>
+
+    <rect x="162" y="58" width="118" height="54" rx="8" fill="#FFFFFF" stroke="#F09595" stroke-width="0.6"/>
+    <text x="221" y="80" fill="#2C2C2A">alu_result</text>
+    <text x="221" y="99" fill="#5F5E5A">与-或树</text>
+
+    <rect x="296" y="58" width="112" height="54" rx="8" fill="#FFFFFF" stroke="#F09595" stroke-width="0.6"/>
+    <text x="352" y="80" fill="#2C2C2A">es_forward_</text>
+    <text x="352" y="99" fill="#5F5E5A">data</text>
+
+    <rect x="424" y="58" width="106" height="54" rx="8" fill="#FFFFFF" stroke="#F09595" stroke-width="0.6"/>
+    <text x="477" y="80" fill="#2C2C2A">ID 前递</text>
+    <text x="477" y="99" fill="#5F5E5A">MUX</text>
+
+    <rect x="546" y="58" width="106" height="54" rx="8" fill="#FFFFFF" stroke="#F09595" stroke-width="0.6"/>
+    <text x="599" y="80" fill="#2C2C2A">分支比较</text>
+    <text x="599" y="99" fill="#5F5E5A">rj_eq_rd 等</text>
+
+    <rect x="668" y="58" width="192" height="54" rx="8" fill="#FFFFFF" stroke="#F09595" stroke-width="0.6"/>
+    <text x="764" y="80" fill="#2C2C2A">next_pc → fs_pc</text>
+    <text x="764" y="99" fill="#5F5E5A">IF 取指地址</text>
+  </g>
+
+  <g stroke="#A32D2D" stroke-width="1.4" fill="none" marker-end="url(#arA)">
+    <path d="M148 85 L158 85"/>
+    <path d="M282 85 L292 85"/>
+    <path d="M410 85 L420 85"/>
+    <path d="M532 85 L542 85"/>
+    <path d="M654 85 L664 85"/>
+  </g>
+
+  <text x="38" y="140" font-size="12.2" fill="#8A1F1F">综合器剪不掉：<tspan font-weight="600">op_mul 是运行期信号、不是常量</tspan>，乘法器只能留在锥里</text>
+  <text x="38" y="162" font-size="12.2" font-weight="600" fill="#8A1F1F">实测组合延迟 21~22 ns &gt; 20 ns（50 MHz）→ 时序不收敛，上板必错</text>
+  <text x="38" y="183" font-size="12.2" fill="#8A1F1F">★ 只改 MUX 的选择端<tspan font-weight="600">没有用</tspan>——静态时序分析照旧分析这条路径，必须在物理上换数据源</text>
+
+  <!-- ============ 下：正确做法 ============ -->
+  <rect x="18" y="208" width="864" height="190" rx="12" fill="#EAF3DE" stroke="#97C459" stroke-width="0.8"/>
+  <text x="38" y="234" font-size="13.4" font-weight="600" fill="#173404">✓ 做法 B：乘法器独立在 EXE_stage 里，结果只进「EXE→MEM 触发器」</text>
+
+  <g font-size="11.5" text-anchor="middle">
+    <rect x="34" y="248" width="112" height="50" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.6"/>
+    <text x="90" y="269" fill="#2C2C2A">乘法器</text>
+    <text x="90" y="286" fill="#5F5E5A">DSP48</text>
+
+    <rect x="162" y="248" width="126" height="50" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.6"/>
+    <text x="225" y="269" fill="#2C2C2A">es_final_result</text>
+    <text x="225" y="286" fill="#5F5E5A">优先级 MUX</text>
+
+    <rect x="304" y="248" width="146" height="50" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.6"/>
+    <text x="377" y="269" fill="#2C2C2A">es_to_ms_bus_r</text>
+    <text x="377" y="286" fill="#5F5E5A">EXE→MEM 触发器</text>
+
+    <rect x="466" y="248" width="150" height="50" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.6"/>
+    <text x="541" y="269" fill="#2C2C2A">ms_forward_data</text>
+    <text x="541" y="286" fill="#5F5E5A">MEM 级前递源</text>
+
+    <rect x="632" y="248" width="228" height="50" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.6"/>
+    <text x="746" y="269" fill="#2C2C2A">写回 / 供下一条指令前递</text>
+    <text x="746" y="286" fill="#5F5E5A">终点是寄存器，不是组合链</text>
+
+    <rect x="34" y="322" width="112" height="50" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.6"/>
+    <text x="90" y="343" fill="#2C2C2A">ALU</text>
+    <text x="90" y="360" fill="#5F5E5A">加减移位逻辑</text>
+
+    <rect x="162" y="322" width="126" height="50" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.6"/>
+    <text x="225" y="343" fill="#2C2C2A">es_forward_</text>
+    <text x="225" y="360" fill="#5F5E5A">result</text>
+
+    <rect x="304" y="322" width="146" height="50" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.6"/>
+    <text x="377" y="343" fill="#2C2C2A">es_forward_data</text>
+    <text x="377" y="360" fill="#5F5E5A">→ ID 前递</text>
+
+    <rect x="466" y="322" width="394" height="50" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.6"/>
+    <text x="663" y="343" fill="#173404" font-weight="600">这条通路里没有乘法器 → 前递链路很短</text>
+    <text x="663" y="360" fill="#5F5E5A">两条通路在物理上互不相交，综合器无法把它们并到一起</text>
+  </g>
+  <g stroke="#3B6D11" stroke-width="1.4" fill="none" marker-end="url(#arB)">
+    <path d="M148 273 L158 273"/>
+    <path d="M290 273 L300 273"/>
+    <path d="M452 273 L462 273"/>
+    <path d="M618 273 L628 273"/>
+    <path d="M148 347 L158 347"/>
+    <path d="M290 347 L300 347"/>
+  </g>
+</svg>
+<div class="cap">图 5A · 同一个乘法器，放在 <code>alu_result</code> 锥里 vs 放在独立结果通路上：功能完全一样，时序差了一个数量级</div>
+</div>
+
+<p>这条长路径是怎么形成的？把五级串起来看就明白了：</p>
+
+<ol>
+<li><code>alu_result</code> 不只是"送下一级"的结果，它<b>同时</b>是 EXE→ID 前递的数据源
+    （<code>es_forward_data</code>）；</li>
+<li>ID 级用前递后的值做<b>分支比较</b>（<code>rj_eq_rd</code> 等）；</li>
+<li>分支结果 <code>br_taken</code> 直接驱动 <code>br_bus</code>，决定 <b>IF 级的下一拍 PC</b>。</li>
+</ol>
+
+<p>于是"乘法器 → 或树 → 前递 MUX → 比较器 → 下一 PC"在<b>一个时钟周期内</b>串成一条组合链。
+这已经不只是跨越三级流水，而是把三条完全不同的功能路径焊在了一起。</p>
+
+<div class="box dang">
+<b>★ 坑 3（本项目最贵的一个坑，修了四轮）：</b><br>
+第一轮修复的直觉是"给乘法结果加一个 MUX，让它别进前递"——<b>无效</b>。
+因为综合器做静态时序分析时看的是<b>逻辑锥</b>而不是"最终会不会被选中"：
+只要乘法器的输出还挂在 <code>alu_result</code> 这条网上，
+它就是这个网的逻辑锥的一部分，路径照旧存在。<br><br>
+<b>正确做法：物理上换数据源</b>——乘法结果根本不参与 <code>alu_result</code> 的计算，
+而是走一条独立的结果通路，终点是触发器：
+<pre style="margin:10px 0 0"><code><span class="cmt">// es_forward_result：可能参与 EXE→ID 前递的结果（ALU / 除法），逻辑锥里没有乘法器</span>
+<span class="kw">wire</span> [31:0] es_forward_result = es_div_inst ? div_result : alu_result;
+<span class="cmt">// es_final_result  ：送 MEM / 写回的最终结果（乘法 &gt; 除法 &gt; ALU），乘法只出现在这里</span>
+<span class="kw">wire</span> [31:0] es_alu_mul_result = es_mul_inst ? mul_result : es_forward_result;</code></pre>
+</div>
+
+<h3>2.3 附带代价：乘法结果不能走 EXE 前递，只好加一个 <code>mul_stall</code></h3>
+
+<p>把乘法器搬走之后，一个新的问题出现了：<b>乘法结果不再出现在 EXE 级的前递口上</b>。
+那么紧跟在乘法后面的指令要用它的结果怎么办？</p>
+
+<p>答案是<b>多等一拍</b>——下一拍乘法已经进入 MEM 级，它的结果躺在
+<code>es_to_ms_bus_r</code> 这个<b>触发器</b>里，由 MEM 级前递提供，路径极短。</p>
+
+<pre><code><span class="cmt">// 乘法结果阻塞（第 5 章·时序修复）：乘法器组合延迟过大，其结果不参与 EXE 级前递。</span>
+<span class="cmt">// 当 EXE 级是一条乘法指令、且本指令的正源寄存器正好是它的目标寄存器时，阻塞 ID 一拍。</span>
+<span class="kw">assign</span> mul_stall = es_is_mul &amp;&amp; (
+    (ds_use_rj  &amp;&amp; (rf_raddr1 != 5'd0) &amp;&amp; (rf_raddr1 == es_forward_dest)) ||
+    (ds_use_rkd &amp;&amp; (rf_raddr2 != 5'd0) &amp;&amp; (rf_raddr2 == es_forward_dest))
+);</code></pre>
+
+<div class="box note">
+<b>这段代码和 <code>load_stall</code> 是同一个模子刻出来的</b>——
+都是"后级结果还没到寄存器里，前级先停一拍"。区别只是：
+load 慢是因为<b>存储器是同步读</b>，mul 慢是因为<b>组合路径太长</b>。
+把它们写成同一个模式，既好懂也好维护。
+</div>
+
+<h3>2.4 一个顺带的性能知识点</h3>
+
+<p><code>mul_stall</code> 只在"<b>紧邻</b>的指令要用乘法结果"时生效，代价是 1 个气泡。
+如果你把编译出来的代码里 <code>mul.w</code> 后面隔一条无关指令，就完全没有停顿。
+汇报时可以主动提这个："<b>处理器微架构的一个小改动，编译器排一下指令顺序就能把损失吃掉</b>"——
+这是很好的"体系结构—编译器协同"话题。</p>
+
+<!-- ======================= §3 ======================= -->
+<h2 id="s3">3 · 除法器：32 拍迭代的恢复余数法</h2>
+
+<h3>3.1 为什么除法不能像乘法那样"一行搞定"</h3>
+
+<p>乘法是"<b>一层层的部分积相加</b>"，32×32 只有 32 个部分积，DSP48 硬核内部就把它们压完了。
+除法不行——它本质上是<b>串行的试商</b>：每一位商都要看"当前余数够不够减"，
+而这个判断依赖上一位的结果。<b>这是一个真正的迭代过程，没有已知的常数级组合实现</b>。</p>
+
+<table>
+<thead><tr><th style="width:150px">方案</th><th style="width:130px">延迟</th><th style="width:120px">资源</th><th>评价</th></tr></thead>
+<tbody>
+<tr><td>组合除法器（一次算完）</td><td>约 32 级减法/比较串联</td><td>极大</td><td>延迟轻松超过 20 ns，直接不可用</td></tr>
+<tr><td><b>迭代除法（本工程）</b></td><td><b>32 拍</b></td><td>一个 33 位减法器 + 若干移位寄存器</td><td><b>资源极少、时序轻松，代价是延迟</b></td></tr>
+<tr><td>SRT / 基-4 除法</td><td>约 16 拍甚至更少</td><td>需要商选择表，控制复杂</td><td>性能好但课设收益不高</td></tr>
+</tbody>
+</table>
+
+<div class="box ok">
+<b>一句话总结：</b>除法用<b>时间</b>换<b>面积</b>。在 50 MHz、BRAM 已经占了器件 87% 的前提下，
+把除法做成 32 拍迭代是唯一现实的选择——它只多占一个 33 位减法器，几乎不增加布线压力。
+</div>
+
+<h3>3.2 恢复余数法：一拍到底在算什么</h3>
+
+<div class="fig">
+<svg viewBox="0 0 900 226" role="img" aria-label="恢复余数法的 32 拍迭代结构">
+  <title>恢复余数法的 32 拍迭代结构</title>
+  <desc>先把被除数和除数取绝对值，然后每拍把余数左移一位并拼上被除数最高位，与除数比较后决定是否相减，同时商左移补位，重复 32 次后按符号还原</desc>
+  <defs>
+    <marker id="arC" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+      <path d="M0,0 L8,3.2 L0,6.4 z" fill="#534AB7"/></marker>
+  </defs>
+
+  <rect x="16" y="36" width="128" height="72" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.7"/>
+  <text x="80" y="60" font-size="12.4" font-weight="600" text-anchor="middle" fill="#0B3D6B">① 装载初值</text>
+  <text x="80" y="79" font-size="11.2" text-anchor="middle" fill="#5F5E5A">dividend←|a|</text>
+  <text x="80" y="95" font-size="11.2" text-anchor="middle" fill="#5F5E5A">divisor←|b|, rem←0</text>
+
+  <rect x="164" y="20" width="470" height="104" rx="10" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.7" stroke-dasharray="5 3"/>
+  <text x="399" y="40" font-size="12.4" font-weight="600" text-anchor="middle" fill="#26215C">② 迭代体 × 32 拍（每拍一次）</text>
+
+  <g font-size="10.8" text-anchor="middle">
+    <rect x="176" y="52" width="104" height="58" rx="7" fill="#FFFFFF" stroke="#AFA9EC" stroke-width="0.6"/>
+    <text x="228" y="72" fill="#2C2C2A">拼接</text>
+    <text x="228" y="89" fill="#5F5E5A">rem_shift =</text>
+    <text x="228" y="103" fill="#5F5E5A">{rem[31:0],Q31}</text>
+
+    <rect x="292" y="52" width="104" height="58" rx="7" fill="#FFFFFF" stroke="#AFA9EC" stroke-width="0.6"/>
+    <text x="344" y="72" fill="#2C2C2A">比较</text>
+    <text x="344" y="89" fill="#5F5E5A">rem_shift</text>
+    <text x="344" y="103" fill="#5F5E5A">≥ divisor ?</text>
+
+    <rect x="408" y="52" width="104" height="58" rx="7" fill="#FFFFFF" stroke="#AFA9EC" stroke-width="0.6"/>
+    <text x="460" y="72" fill="#2C2C2A">条件减</text>
+    <text x="460" y="89" fill="#5F5E5A">够减则相减</text>
+    <text x="460" y="103" fill="#5F5E5A">否则保持(恢复)</text>
+
+    <rect x="524" y="52" width="100" height="58" rx="7" fill="#FFFFFF" stroke="#AFA9EC" stroke-width="0.6"/>
+    <text x="574" y="72" fill="#2C2C2A">更新</text>
+    <text x="574" y="89" fill="#5F5E5A">rem ← rem_next</text>
+    <text x="574" y="103" fill="#5F5E5A">quo ← {q,go}</text>
+  </g>
+  <g stroke="#534AB7" stroke-width="1.3" fill="none" marker-end="url(#arC)">
+    <path d="M282 81 L288 81"/>
+    <path d="M398 81 L404 81"/>
+    <path d="M514 81 L520 81"/>
+  </g>
+  <!-- 回环箭头 -->
+  <path d="M574 110 L574 138 L228 138 L228 112" stroke="#534AB7" stroke-width="1.3" fill="none"
+        stroke-dasharray="4 3" marker-end="url(#arC)"/>
+  <text x="400" y="156" font-size="11" text-anchor="middle" fill="#534AB7">循环 32 次（cnt 从 32 减到 1）</text>
+
+  <rect x="652" y="36" width="112" height="72" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.7"/>
+  <text x="708" y="60" font-size="12.4" font-weight="600" text-anchor="middle" fill="#04362C">③ 符号还原</text>
+  <text x="708" y="79" font-size="11.2" text-anchor="middle" fill="#5F5E5A">商：取反加一</text>
+  <text x="708" y="95" font-size="11.2" text-anchor="middle" fill="#5F5E5A">余：取反加一</text>
+
+  <rect x="782" y="36" width="100" height="72" rx="10" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.7"/>
+  <text x="832" y="60" font-size="12.4" font-weight="600" text-anchor="middle" fill="#173404">④ 输出</text>
+  <text x="832" y="79" font-size="11.2" text-anchor="middle" fill="#5F5E5A">{商, 余数}</text>
+  <text x="832" y="95" font-size="11.2" text-anchor="middle" fill="#5F5E5A">64 位一拍</text>
+
+  <g stroke="#534AB7" stroke-width="1.4" fill="none" marker-end="url(#arC)">
+    <path d="M144 72 L160 72"/>
+    <path d="M638 72 L648 72"/>
+    <path d="M764 72 L778 72"/>
+  </g>
+
+  <rect x="16" y="166" width="866" height="46" rx="8" fill="#FBFAF7" stroke="#E3E1DA" stroke-width="0.6"/>
+  <text x="34" y="186" font-size="11.8" fill="#5F5E5A">每拍只做三件小事：<tspan font-weight="600" fill="#2C2C2A">① 余数左移一位并拼上被除数当前最高位　② 和除数比一次　③ 决定减不减，商的低位补 1 或 0</tspan></text>
+  <text x="34" y="204" font-size="11.8" fill="#5F5E5A">"恢复余数"的意思是：如果不够减，余数就<tspan font-weight="600" fill="#2C2C2A">恢复原值</tspan>（本工程用 MUX 直接选回原值，等价于"减完再加回来"，省掉一次加法）</text>
+</svg>
+<div class="cap">图 5B · 恢复余数法：32 拍迭代，一拍一个减法，商从右往左长出来</div>
+</div>
+
+<p>用一个小例子把 32 拍"压缩"成 4 拍看清楚（<code>13 ÷ 3</code>，用 4 位演示）：</p>
+
+<table>
+<thead><tr><th style="width:70px">拍</th><th class="mono" style="width:200px">rem_shift = {rem, 被除数下一位}</th><th class="mono" style="width:130px">≥ 3 ?</th><th class="mono" style="width:110px">rem_next</th><th class="mono">quo_next</th></tr></thead>
+<tbody>
+<tr><td>1</td><td class="mono">{0000, <b>1</b>} = 1</td><td>否</td><td class="mono">1</td><td class="mono">000<b>0</b></td></tr>
+<tr><td>2</td><td class="mono">{0001, <b>1</b>} = 3</td><td><b>是</b> → 3−3</td><td class="mono">0</td><td class="mono">00<b>0</b>1</td></tr>
+<tr><td>3</td><td class="mono">{0000, <b>0</b>} = 0</td><td>否</td><td class="mono">0</td><td class="mono">0<b>0</b>10</td></tr>
+<tr><td>4</td><td class="mono">{0000, <b>1</b>} = 1</td><td>否</td><td class="mono">1</td><td class="mono"><b>0</b>100</td></tr>
+<tr><td colspan="4">结果</td><td class="mono">商 0100 = 4，余 1 → 13 = 3×4 + 1 ✓</td></tr>
+</tbody>
+</table>
+
+<p class="small">注意被除数是<b>从高位往低位</b>一位一位喂进去的（所以每拍要 <code>dividend_r = {dividend_r[30:0], 1'b0}</code> 左移），
+商是<b>从低位往高位</b>长出来的（<code>quo_r = {quo_r[30:0], rem_ge}</code>）。一进一出方向相反，这是最容易写反的地方。</p>
+
+<h3>3.3 <code>divider.v</code> 的内部结构</h3>
+
+<pre><code><span class="kw">reg</span> [31:0] dividend_r;   <span class="cmt">// 被除数绝对值，逐拍左移，最高位被"喂"进余数</span>
+<span class="kw">reg</span> [31:0] divisor_r;    <span class="cmt">// 除数绝对值（不变）</span>
+<span class="kw">reg</span> [32:0] rem_r;        <span class="cmt">// 余数，多 1 位用来容纳移位后的进位</span>
+<span class="kw">reg</span> [31:0] quo_r;        <span class="cmt">// 商（绝对值），逐拍从低位补入</span>
+<span class="kw">reg</span> [ 5:0] cnt;          <span class="cmt">// 剩余迭代次数，32 → 1</span>
+<span class="kw">reg</span>        quo_sign;     <span class="cmt">// 商符号 = 被除数符号 ^ 除数符号</span>
+<span class="kw">reg</span>        rem_sign;     <span class="cmt">// 余数符号 = 被除数符号</span>
+
+<span class="cmt">// 一拍迭代的全部组合逻辑（就这么四行）</span>
+<span class="kw">wire</span> [32:0] rem_shift = {rem_r[<span class="sig">31:0</span>], dividend_r[<span class="sig">31</span>]};
+<span class="kw">wire</span>        rem_ge    = (rem_shift &gt;= {<span class="sig">1'b0</span>, divisor_r});
+<span class="kw">wire</span> [32:0] rem_next  = rem_ge ? (rem_shift - {<span class="sig">1'b0</span>, divisor_r}) : rem_shift;
+<span class="kw">wire</span> [31:0] quo_next  = {quo_r[<span class="sig">30:0</span>], rem_ge};</code></pre>
+
+<div class="box note">
+<b>为什么余数要 33 位？</b>因为 <code>rem_shift</code> 是把 32 位余数左移一位再拼 1 位，一共 33 位。
+如果只用 32 位，最高位会在移位时丢掉——而"丢掉的最高位"恰恰可能让 <code>rem_shift</code>
+超过一个 32 位数，导致比较结果出错。这是手写除法器<b>第二容易错</b>的地方（第一是符号）。
+</div>
+
+<h3>3.4 符号处理：绝对值域相除 + 末拍取反</h3>
+
+<p>本工程的做法是把有符号除法<b>完全化成无符号除法</b>：</p>
+
+<pre><code><span class="cmt">// ① 进入时取绝对值</span>
+<span class="kw">wire</span> [31:0] dividend_abs = (SIGNED &amp;&amp; s_axis_dividend_tdata[31]) ? (~s_axis_dividend_tdata + <span class="sig">32'b1</span>)
+                                                             :   s_axis_dividend_tdata;
+<span class="kw">wire</span> [31:0] divisor_abs  = (SIGNED &amp;&amp; s_axis_divisor_tdata[31])  ? (~s_axis_divisor_tdata  + <span class="sig">32'b1</span>)
+                                                             :   s_axis_divisor_tdata;
+
+<span class="cmt">// ② 32 拍无符号迭代（同上）</span>
+
+<span class="cmt">// ③ 末拍按符号还原：求相反数 = 取反加一</span>
+<span class="kw">wire</span> [31:0] quo_final = quo_sign ? (~quo_next       + <span class="sig">32'b1</span>) : quo_next;
+<span class="kw">wire</span> [31:0] rem_final = rem_sign ? (~rem_next[<span class="sig">31:0</span>] + <span class="sig">32'b1</span>) : rem_next[<span class="sig">31:0</span>];</code></pre>
+
+<div class="box ok">
+<b>为什么这样能自动得到"向零取整"？</b><br>
+因为绝对值域上的除法<b>本身就是截断的</b>：<code>|a| / |b|</code> 是无符号整数除，天然向下取整
+（在非负数域上"向下"就是"向零"）。然后再给商单独加符号——
+于是 <code>−7 / 2</code> 走的是 <code>7/2 = 3</code>，再加负号得 <code>−3</code>，正是不补 1 的截断结果。<br>
+如果反过来在补码域直接迭代（不取绝对值），负数会得到 floor 语义 <code>−4</code>，与 LA32R 不符。
+</div>
+
+<p>余数为什么"跟着被除数"？看这两行的 <code>rem_sign</code> 就懂了：</p>
+
+<pre><code>quo_sign &lt;= SIGNED ? (s_axis_dividend_tdata[<span class="sig">31</span>] ^ s_axis_divisor_tdata[<span class="sig">31</span>]) : <span class="sig">1'b0</span>;
+rem_sign &lt;= SIGNED ?  s_axis_dividend_tdata[<span class="sig">31</span>]                              : <span class="sig">1'b0</span>;</code></pre>
+
+<p><b>商看两者的符号异或，余数只看被除数的符号</b>——这就是 §1.4 那张表第 3、4 行的来历。</p>
+
+<h3 id="s35">3.5 EXE 级怎么"等"这 32 拍：握手 + 锁存</h3>
+
+<div class="fig">
+<svg viewBox="0 0 900 344" role="img" aria-label="除法指令在 EXE 级的握手时序">
+  <title>除法指令在 EXE 级的握手时序</title>
+  <desc>第 0 拍发出 tvalid 并握手成功，第 1 到 32 拍迭代，第 33 拍 dout_valid 拉高并使 ready_go 拉高，指令流出到 MEM 级</desc>
+  <defs>
+    <marker id="arD" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 z" fill="#888780"/></marker>
+  </defs>
+
+  <!-- 信号名 -->
+  <g font-size="11.2" text-anchor="end" fill="#5F5E5A" font-family="SFMono-Regular,Consolas,monospace">
+    <text x="146" y="62">clk</text>
+    <text x="146" y="92">es_valid</text>
+    <text x="146" y="122">tvalid (div_req)</text>
+    <text x="146" y="152">tready</text>
+    <text x="146" y="182">state == BUSY</text>
+    <text x="146" y="212">m_axis_dout_tvalid</text>
+    <text x="146" y="242">es_div_ready</text>
+    <text x="146" y="272">es_ready_go / 流出</text>
+  </g>
+
+  <!-- 周期刻度：c0 c1 c2 | 省略 | c31 c32 c33 -->
+  <g stroke="#E3E1DA" stroke-width="0.6">
+    <line x1="150" y1="40" x2="150" y2="292"/>
+    <line x1="232" y1="40" x2="232" y2="292"/>
+    <line x1="314" y1="40" x2="314" y2="292"/>
+    <line x1="396" y1="40" x2="396" y2="292"/>
+    <line x1="436" y1="40" x2="436" y2="292"/>
+    <line x1="518" y1="40" x2="518" y2="292"/>
+    <line x1="600" y1="40" x2="600" y2="292"/>
+    <line x1="682" y1="40" x2="682" y2="292"/>
+  </g>
+  <g font-size="10.6" text-anchor="middle" fill="#888780" font-family="SFMono-Regular,Consolas,monospace">
+    <text x="191" y="36">c0</text><text x="273" y="36">c1</text><text x="355" y="36">c2</text>
+    <text x="477" y="36">c31</text><text x="559" y="36">c32</text><text x="641" y="36">c33</text>
+  </g>
+
+  <!-- 波形 -->
+  <!-- clk：每拍 82，高电平占后半拍 -->
+  <path d="M150 74 L191 74 L191 46 L232 46 L232 74 L273 74 L273 46 L314 46 L314 74 L355 74 L355 46 L396 46 L396 74
+           M436 74 L477 74 L477 46 L518 46 L518 74 L559 74 L559 46 L600 46 L600 74 L641 74 L641 46 L682 46"
+        stroke="#185FA5" stroke-width="1.4" fill="none"/>
+
+  <!-- es_valid：c0..c33 全高 -->
+  <rect x="150" y="86" width="532" height="14" fill="#E1F5EE" stroke="#0F6E56" stroke-width="1"/>
+
+  <!-- tvalid：仅 c0 -->
+  <rect x="150" y="116" width="82" height="14" fill="#FAEEDA" stroke="#854F0B" stroke-width="1"/>
+  <rect x="232" y="130" width="450" height="2" fill="#B4B2A9"/>
+
+  <!-- tready：仅 c0 -->
+  <rect x="150" y="146" width="82" height="14" fill="#FAEEDA" stroke="#854F0B" stroke-width="1"/>
+  <rect x="232" y="160" width="450" height="2" fill="#B4B2A9"/>
+
+  <!-- state BUSY：c1..c32 -->
+  <rect x="232" y="176" width="368" height="14" fill="#EEEDFE" stroke="#534AB7" stroke-width="1"/>
+  <text x="273" y="187" font-size="10" text-anchor="middle" fill="#26215C">BUSY</text>
+
+  <!-- dout_valid：仅 c33 -->
+  <rect x="600" y="206" width="82" height="14" fill="#FCEBEB" stroke="#A32D2D" stroke-width="1"/>
+  <text x="641" y="217" font-size="10" text-anchor="middle" fill="#8A1F1F">1 拍</text>
+  <rect x="150" y="220" width="532" height="2" fill="#B4B2A9"/>
+
+  <!-- es_div_ready：c33 -->
+  <rect x="600" y="236" width="82" height="14" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1"/>
+  <rect x="150" y="250" width="532" height="2" fill="#B4B2A9"/>
+
+  <!-- es_ready_go：c33 -->
+  <rect x="600" y="266" width="82" height="14" fill="#EAF3DE" stroke="#3B6D11" stroke-width="1"/>
+  <rect x="150" y="280" width="532" height="2" fill="#B4B2A9"/>
+
+  <!-- 标注 -->
+  <text x="700" y="118" font-size="11" fill="#854F0B">← 这一拍握手成功</text>
+  <text x="700" y="152" font-size="11" fill="#854F0B">← 之后必须撤销 tvalid</text>
+  <text x="700" y="218" font-size="11" fill="#8A1F1F">← 结果有效</text>
+  <text x="700" y="278" font-size="11" fill="#3B6D11">← 指令流出到 MEM</text>
+
+  <text x="150" y="306" font-size="11.4" fill="#5F5E5A">总计占用 EXE 级 <tspan font-weight="600" fill="#2C2C2A">34 拍</tspan>：1 拍握手 + 32 拍迭代 + 1 拍出结果。</text>
+  <text x="150" y="324" font-size="11.4" fill="#5F5E5A">这段时间里 <tspan font-family="SFMono-Regular,Consolas,monospace">es_ready_go = 0</tspan> → <tspan font-family="SFMono-Regular,Consolas,monospace">es_allowin = 0</tspan>，ID 级被自然反压。</text>
+
+  <!-- 省略带（最后绘制，盖住中间 30 拍） -->
+  <rect x="396" y="40" width="40" height="252" fill="#FBFAF7"/>
+  <path d="M398 60 L432 60 M398 68 L432 68" stroke="#B4B2A9" stroke-width="1.1"/>
+  <path d="M398 82 L432 82 M398 90 L432 90" stroke="#B4B2A9" stroke-width="1.1"/>
+  <text x="416" y="200" font-size="13" text-anchor="middle" fill="#888780">⋯</text>
+  <text x="416" y="220" font-size="13" text-anchor="middle" fill="#888780">⋯</text>
+</svg>
+<div class="cap">图 5C · 除法指令的握手时序：靠 <code>es_ready_go</code> 让本级"占住" 34 拍（图中省略中间的 30 拍迭代），后级不冻结、前级自动停</div>
+</div>
+
+<p>关键只有两句话：</p>
+
+<pre><code><span class="cmt">// 普通指令 ready_go 恒为 1；除法指令要等结果就绪</span>
+<span class="kw">assign</span> es_ready_go    = !es_div_inst || es_div_ready;
+<span class="kw">assign</span> es_allowin     = !es_valid || (es_ready_go &amp;&amp; ms_allowin);
+<span class="kw">assign</span> es_to_ms_valid = es_valid &amp;&amp; es_ready_go;</code></pre>
+
+<div class="box ok">
+<b>这就是当初设计 <code>ready_go / allowin</code> 握手规范的价值。</b><br>
+如果每一级都硬编码成"一拍一级"，加一个多拍部件就得大改。
+而因为本工程从一开始就用<b>"本级是否准备好往下走"</b>这个抽象，
+第 5 章加除法时<b>只改了一行</b> <code>es_ready_go</code>：
+<ul style="margin:8px 0 0">
+<li><code>ms_allowin</code> 不变 → MEM 级完全不知道前面卡住了；</li>
+<li>ID 级也不变 → 它只会发现 <code>es_allowin=0</code>，于是自己停下、把 <code>ds_valid</code> 保持住。</li>
+</ul>
+<b>汇报时这是一个极好的"设计抽象带来的可扩展性"案例。</b>
+</div>
+
+<h4>三个必须处理的状态细节</h4>
+
+<table>
+<thead><tr><th class="mono" style="width:110px">寄存器</th><th style="width:230px">作用</th><th>不写会怎样</th></tr></thead>
+<tbody>
+<tr><td class="mono">div_sent</td><td>记录"这次除法请求已经握手成功"</td>
+    <td>除法器空闲后 <code>tready</code> 重新拉高，而 <code>tvalid</code> 还高高挂着 → 除法器以为<b>又来了一次新除法</b>，重新算 32 拍，永远出不来</td></tr>
+<tr><td class="mono">div_done</td><td>记录"结果已经锁存"</td>
+    <td><code>m_axis_dout_tvalid</code> 只持续 1 拍。如果这一拍 <code>ms_allowin=0</code>（MEM 级反压），结果就凭空消失了</td></tr>
+<tr><td class="mono">div_result_r</td><td>锁存住那个 32 位结果</td>
+    <td>同上，配合 <code>div_done</code> 使用</td></tr>
+</tbody>
+</table>
+
+<pre><code><span class="kw">else if</span> (es_div_inst &amp;&amp; es_ready_go &amp;&amp; ms_allowin) <span class="kw">begin</span>
+    <span class="cmt">// 除法指令本拍流出 EXE，控制状态复位，准备迎接下一条除法指令</span>
+    div_sent &lt;= <span class="sig">1'b0</span>;
+    div_done &lt;= <span class="sig">1'b0</span>;
+<span class="kw">end</span>
+<span class="kw">else begin</span>
+    <span class="kw">if</span> (div_handshake) div_sent &lt;= <span class="sig">1'b1</span>;              <span class="cmt">// 已握手 → 下一拍撤销 tvalid</span>
+    <span class="kw">if</span> (div_dout_valid) <span class="kw">begin</span>                          <span class="cmt">// 结果有效 → 立刻锁存</span>
+        div_done     &lt;= <span class="sig">1'b1</span>;
+        div_result_r &lt;= div_result_now;
+    <span class="kw">end</span>
+<span class="kw">end</span></code></pre>
+
+<h3>3.6 为什么要例化两个除法器</h3>
+
+<p><code>SIGNED</code> 是 <code>divider</code> 的<b>参数</b>（不是在运行期判断的），
+因为"要不要取绝对值"会改变整个数据通路的接线：</p>
+
+<pre><code><span class="cmt">// 有符号除法器（div.w / mod.w）</span>
+divider #(<span class="sig">.SIGNED(1)</span>) u_divider_signed (
+    .s_axis_dividend_tvalid (div_req &amp;  es_div_signed),
+    .s_axis_dividend_tdata  (es_alu_src1),          <span class="cmt">// 被除数 = rj</span>
+    .s_axis_divisor_tdata   (es_alu_src2),          <span class="cmt">// 除数   = rk</span>
+    ...
+);
+<span class="cmt">// 无符号除法器（div.wu / mod.wu）</span>
+divider #(<span class="sig">.SIGNED(0)</span>) u_divider_unsigned (
+    .s_axis_dividend_tvalid (div_req &amp; ~es_div_signed),
+    ...
+);</code></pre>
+
+<p>两个实例共享同一个 <code>div_req</code>，但 tvalid 上各与一个使能项相与，
+所以每次只有真正需要的那一个被激活。综合时 Vivado 会做<b>资源共享之外的死逻辑消除</b>，
+不会真的布两套完整电路那么可怕——但它确实占两份 33 位减法器。</p>
+
+<div class="box warn">
+<b>★ 坑 4：别在 testbench 里"连续两条除法背靠背"却不检查中间隔了几拍。</b><br>
+由于 <code>div_sent</code> 在指令流出那一拍才清零，两条紧邻的除法指令之间
+<b>至少会有一个气泡</b>（EXE 必须先回到 IDLE 才能接收下一次握手）。
+这<b>不是 bug</b>，是 AXI-Stream 式握手 + 非流水除法器的必然结果。
+如果要做"每拍都能起一次除法"的除法器，就得做<b>流水化除法器</b>（32 级流水），
+那是另一种设计权衡，本课设不需要。
+</div>
+
+<h3>3.7 除零怎么办</h3>
+
+<div class="box note">
+<b>LA32R 规定：除数为 0 时结果不可预测，但<b>不产生任何异常</b>。</b><br>
+本工程的实现（见 <code>divider.v</code> 文件头注释）：
+由于 <code>divisor_abs = 0</code>，<code>rem_ge = (rem_shift &gt;= 0)</code> 恒为真，
+所以商逐位全补 1 → <b>商 = 0xFFFFFFFF</b>；余数不减任何东西，逐拍左移吸收被除数 →
+<b>余数 = 被除数</b>。<br>
+这个结果是"确定的任意值"，符合手册要求，也让仿真可复现
+（否则 X 传播会把整条流水线带崩）。<br>
+<span class="small">注意：本工程的 func 测试里<b>没有</b>除数为 0 的用例（只有被除数为 0 的），
+所以这条行为没被验证过——但它是"良定义"的，不影响判分。</span>
+</div>
+
+<!-- ======================= §4 ======================= -->
+<h2 id="s4">4 · 流水线视角：多拍指令带来的三类问题</h2>
+
+<h3>4.1 一张表看全：五类阻塞信号</h3>
+
+<table>
+<thead><tr><th class="mono" style="width:150px">阻塞信号</th><th style="width:290px">触发条件</th><th style="width:130px">停几拍</th><th>为什么需要</th></tr></thead>
+<tbody>
+<tr><td class="mono">load_stall</td><td>EXE 是 load，且 ID 指令要用它的结果</td><td>1 拍</td><td>同步 RAM：数据要到 MEM 级才回来</td></tr>
+<tr><td class="mono"><b>div_stall</b></td><td>EXE 是除/取模，结果未就绪，且 ID 指令要用它的结果</td><td><b>最多 34 拍</b></td><td>除法器要 32 拍迭代</td></tr>
+<tr><td class="mono"><b>mul_stall</b></td><td>EXE 是乘法，且 ID 指令要用它的结果</td><td>1 拍</td><td>乘法结果被移出 EXE 前递（时序修复）</td></tr>
+<tr><td class="mono"><b>branch_load_stall</b></td><td>MEM 是 load，ID 是分支，且分支要用它的值</td><td>1 拍</td><td>分支不能吃"从 BRAM 出来"的前递值（时序修复）</td></tr>
+<tr><td class="mono">csr_stall</td><td>EXE 是 CSR 指令，且 ID 指令要用它的结果</td><td>1 拍</td><td>CSR 结果不进 EXE 前递（第 6 章）</td></tr>
+</tbody>
+</table>
+
+<div class="box ok">
+<b>五条 <code>*_stall</code> 用的是同一个模板</b>，这是本工程最值得强调的"一致性"：
+<pre style="margin:10px 0 0"><code><span class="kw">assign</span> xxx_stall = es_is_xxx &amp;&amp; (
+    (ds_use_rj  &amp;&amp; (rf_raddr1 != 5'd0) &amp;&amp; (rf_raddr1 == es_forward_dest)) ||
+    (ds_use_rkd &amp;&amp; (rf_raddr2 != 5'd0) &amp;&amp; (rf_raddr2 == es_forward_dest))
+);</code></pre>
+"<b>某个源寄存器正在等一个还没到的结果 → 停一拍</b>"。
+理解了一个，五个就都懂了。老师问"你加了几个阻塞，会不会乱"，这张表就是答案。
+</div>
+
+<h3>4.2 除法为什么不阻塞后级？</h3>
+
+<p>一个常见误解是"除法慢，所以整条流水线都停下来"。实际不会：
+<code>es_ready_go=0</code> 只让<b>本级</b>不走，MEM/WB 继续把前面已进来的指令排空，
+ID 级则自动停住不再送新指令。<b>效果等价于插入气泡</b>，而不是全局暂停。</p>
+
+<p>唯一的代价是性能：一条 <code>div.w</code> 占 34 拍，等于浪费了 33 个流水级槽位。
+如果代码里有一段密集除法（比如软件除法算法），性能会明显下降。
+汇报时可以提一句"<b>这就是为什么现代处理器要么做流水化除法器，要么干脆不提供除法指令</b>"
+（RISC-V 的 M 扩展就把除法留成可选的、多拍的）。</p>
+
+<h3>4.3 第 5 章给级间总线加了几个字段？</h3>
+
+<p>答案有点反直觉：<b>只往 ID→EXE 加了 3 位</b>（<code>div_en / div_signed / div_rem</code>）。
+EXE→MEM、MEM→WB <b>一位都没加</b>——因为一旦出了 EXE，乘法和除法的结果
+跟一条 <code>add.w</code> 的结果没有任何区别，都是 <code>ms_alu_result</code>。</p>
+
+<div class="box note">
+<b>这是一个很好的"信息最小化"设计点：</b>控制信息只在<b>需要它的那一级</b>存在。
+乘法/除法的"身份"在 EXE 级就用完了（选哪半边结果、用哪个除法器），
+没有理由再往后面传。<b>总线越窄，布线越松，时序越好。</b>
+</div>
+
+<h4>第 5 章相关的总线字段（<code>ds_to_es_bus</code>，当前共 184 位）</h4>
+
+<div class="bits">
+  <span class="bf c0"><span class="n">ertn</span><span class="r">[183]</span></span>
+  <span class="bf c0"><span class="n">ex_flags</span><span class="r">[182:177]</span></span>
+  <span class="bf c0"><span class="n">csr_num</span><span class="r">[176:163]</span></span>
+  <span class="bf c0"><span class="n">csr_re</span><span class="r">[162]</span></span>
+  <span class="bf c0"><span class="n">csr_we</span><span class="r">[161]</span></span>
+  <span class="bf c0"><span class="n">csr_xchg</span><span class="r">[160]</span></span>
+  <span class="bf c0"><span class="n">rsv</span><span class="r">[159]</span></span>
+  <span class="bf c3"><span class="n">alu_op ★</span><span class="r">[158:143]</span></span>
+  <span class="bf c5"><span class="n">div_en ★</span><span class="r">[142]</span></span>
+  <span class="bf c5"><span class="n">div_signed ★</span><span class="r">[141]</span></span>
+  <span class="bf c5"><span class="n">div_rem ★</span><span class="r">[140]</span></span>
+  <span class="bf c0"><span class="n">res_from_mem</span><span class="r">[139]</span></span>
+  <span class="bf c1"><span class="n">alu_src1</span><span class="r">[138:107]</span></span>
+  <span class="bf c1"><span class="n">alu_src2</span><span class="r">[106:75]</span></span>
+  <span class="bf c0"><span class="n">gr_we</span><span class="r">[74]</span></span>
+  <span class="bf c0"><span class="n">mem_we</span><span class="r">[73]</span></span>
+  <span class="bf c0"><span class="n">mem_size</span><span class="r">[72:70]</span></span>
+  <span class="bf c0"><span class="n">ld_signed</span><span class="r">[69]</span></span>
+  <span class="bf c1"><span class="n">dest</span><span class="r">[68:64]</span></span>
+  <span class="bf c1"><span class="n">rkd_value</span><span class="r">[63:32]</span></span>
+  <span class="bf c1"><span class="n">pc</span><span class="r">[31:0]</span></span>
+</div>
+
+<p class="small">颜色：<span class="tag ch5">第 5 章新增</span><code>div_en / div_signed / div_rem</code>（3 位）
+　<span class="tag ch5">第 5 章使用</span><code>alu_op[14:12]</code> 作为 mul.w / mulh.w / mulh.wu 的标记
+（ALU 内部不使用，只在 EXE 级被解码，见 <code>es_mul_inst = alu_op[12]|alu_op[13]|alu_op[14]</code>）。
+灰色为第 1–4、6 章字段。</p>
+
+<!-- ======================= §5 ======================= -->
+<h2 id="s5">5 · EXP7 测了什么（n30–n36 测试点全表）</h2>
+
+<h3>5.1 七个测试点，1060 组向量</h3>
+
+<p>func 测试里第 5 章对应 <b>n30–n36 共 7 个测试文件</b>，每个文件是一个"测试点"，
+通过就 <code>s3++</code>，最后输出 <code>(s0&lt;&lt;24) | s3</code>：</p>
+
+<table>
+<thead><tr><th class="mono" style="width:70px">编号</th><th class="mono" style="width:150px">文件</th><th class="mono" style="width:100px">指令</th><th class="mono" style="width:86px">向量数</th><th>考点</th></tr></thead>
+<tbody>
+<tr><td class="mono">n30</td><td class="mono">n30_div_w.S</td><td class="mono">div.w</td><td class="mono">122</td><td>有符号商：向零取整、异号、被除数绝对值小于除数</td></tr>
+<tr><td class="mono">n31</td><td class="mono">n31_div_wu.S</td><td class="mono">div.wu</td><td class="mono">178</td><td>无符号商：高位为 1 的数被当成大正数</td></tr>
+<tr><td class="mono">n32</td><td class="mono">n32_mul_w.S</td><td class="mono">mul.w</td><td class="mono">159</td><td>乘积低 32 位（截断语义，符号无关）</td></tr>
+<tr><td class="mono">n33</td><td class="mono">n33_mulh_w.S</td><td class="mono">mulh.w</td><td class="mono">159</td><td>有符号乘积高 32 位</td></tr>
+<tr><td class="mono">n34</td><td class="mono">n34_mulh_wu.S</td><td class="mono">mulh.wu</td><td class="mono">142</td><td>无符号乘积高 32 位</td></tr>
+<tr><td class="mono">n35</td><td class="mono">n35_mod_w.S</td><td class="mono">mod.w</td><td class="mono">122</td><td>有符号余数：<b>符号跟随被除数</b></td></tr>
+<tr><td class="mono">n36</td><td class="mono">n36_mod_wu.S</td><td class="mono">mod.wu</td><td class="mono">178</td><td>无符号余数</td></tr>
+<tr><td colspan="3" class="mono"><b>合计</b></td><td class="mono"><b>1060</b></td><td>7 个测试点</td></tr>
+</tbody>
+</table>
+
+<div class="box ok">
+<b>这张表可以直接背下来当汇报提纲</b>：<br>
+EXP4 = 20 条基线 + 9 条算逻 = <b>29</b><br>
+EXP5 = + 4 条转移 = <b>33</b><br>
+EXP6 = + 6 条访存 = <b>39</b><br>
+<b>EXP7 = + 7 条乘除 = 46</b>　← 本讲义的范围<br>
+EXP8 = + 1 条异常相关（基础异常档）= <b>47</b><br>
+EXP9（扩展档）= <b>58</b>（含中断、ADEF/ALE/INE、rdcnt）
+</div>
+
+<h3>5.2 测试宏长什么样</h3>
+
+<pre><code><span class="sig">#define</span> TEST_DIV_W(in_a, in_b, ref) \
+    li.w t0, in_a; \
+    li.w t1, in_b; \
+    div.w t3, t0, t1; \
+    li.w t4, ref; \
+    bne t4, t3, inst_error</code></pre>
+
+<p>所以 <code>inst/n30_div_w.S</code> 里每一行就是一整段"装数 → 执行 → 比对"：</p>
+
+<pre><code>TEST_DIV_W(<span class="sig">0x56bedfa4</span>, <span class="sig">0x20831400</span>, <span class="sig">0x00000002</span>)   <span class="cmt">// 我们的 CPU 必须算出 0x00000002</span>
+TEST_DIV_W(<span class="sig">0x323676e0</span>, <span class="sig">0xdc3a3f10</span>, <span class="sig">0xffffffff</span>)   <span class="cmt">// 异号大数：结果必须是 -1</span>
+TEST_DIV_W(<span class="sig">0xfda5ea8a</span>, <span class="sig">0xfac1873c</span>, <span class="sig">0x00000000</span>)   <span class="cmt">// 同负且 |a|&lt;|b|：商 0</span></code></pre>
+
+<div class="box warn">
+<b>★ 为什么这几组向量特别值得关注？</b><br>
+因为它们是<b>专门用来打"朴素实现"的</b>：
+<ul style="margin:8px 0 0">
+<li>如果除法器没做符号处理 → 异号那组直接错。</li>
+<li>如果把除法实现成 floor（向下取整）→ <code>0x323676e0 / 0xdc3a3f10</code> 会算出 <code>−2</code>，
+    而正确答案是 <code>−1</code>，差 1。</li>
+<li>如果余数符号跟着除数走（几何除法的直觉）→ n35 那组 <code>0x0e70b5f0</code> 会算成负数。</li>
+<li>如果 <code>mulh.w</code> 与 <code>mulh.wu</code> 共用一个表达式 → n33 / n34 至少一个全错。</li>
+</ul>
+这四条正好对本章的四个设计决策，<b>一处写错就是一个测试点红掉</b>——所以 func 的判分很"讲理"。
+</div>
+
+<h3>5.3 测试机制：ref 是怎么来的</h3>
+
+<p>和前面几章一样，<code>ref</code>（参考值）是<b>由另一套独立实现的 LoongArch 语义在编译前算好</b>、
+作为立即数编进程序的（<code>li.w t4, ref</code>）。CPU 算出的结果与它不等就跳 <code>inst_error</code>。
+<b>这等于用一个"外部阅卷老师"给我们的 CPU 判卷</b>，比自己写波形断言可靠得多。</p>
+
+<p>仿真侧还有第二重保险：把每条指令的写回结果逐拍与官方
+<code>golden_trace.txt</code> 比对，任何一条对不上就立刻报错并停在当前 PC。</p>
+
+<!-- ======================= §6 ======================= -->
+<h2 id="s6">6 · 我们的工程：为这一章具体改了什么</h2>
+
+<table>
+<thead><tr><th class="mono" style="width:130px">文件</th><th>改动内容</th></tr></thead>
+<tbody>
+<tr><td class="mono"><b>divider.v</b><br><span class="small">（新增，146 行）</span></td>
+    <td>参数化 <code>SIGNED</code> 的 32 拍恢复余数除法器；接口完全对齐 Xilinx Divider Generator
+        （<code>s_axis_*_tvalid/tready/tdata</code> + <code>m_axis_dout_tvalid/tdata</code>）；
+        <code>tdata[63:32]</code>=商、<code>[31:0]</code>=余数</td></tr>
+<tr><td class="mono">ID_stage.v</td>
+    <td>7 条指令译码（四字段全写）；生成 <code>ds_div_en / ds_div_signed / ds_div_rem</code>；
+        <code>alu_op[12..14]</code> 标记三条乘法；
+        <code>gr_we</code> / <code>ds_use_rj</code> / <code>ds_use_rkd</code> 覆盖新指令（保证前递与写回）；
+        新增 <code>div_stall</code> / <code>mul_stall</code> / <code>branch_load_stall</code></td></tr>
+<tr><td class="mono">EXE_stage.v</td>
+    <td>① 组合乘法器（两个 64 位乘积 + 3 选 1 MUX），<b>刻意独立于 ALU</b>；<br>
+        ② 例化两个 <code>divider</code> + 握手/锁存状态机（<code>div_sent / div_done / div_result_r</code>）；<br>
+        ③ <code>es_ready_go</code> 加 <code>!es_div_inst || es_div_ready</code> 门控；<br>
+        ④ 结果<b>分成两条通路</b>：<code>es_forward_result</code>（ALU/除法，可前递）
+        与 <code>es_final_result</code>（含乘法，只进 EXE→MEM 寄存器）；<br>
+        ⑤ 输出 <code>es_is_div / es_div_ready / es_is_mul</code> 给 ID 级做阻塞判断</td></tr>
+<tr><td class="mono">alu.v</td>
+    <td><b>零功能改动</b>——只在文件头补了注释，说明 <code>alu_op[12..14]</code> 为何不在这里实现</td></tr>
+<tr><td class="mono">MEM_stage.v</td>
+    <td><b>零改动</b>——乘除结果此时已经是普通的 <code>ms_alu_result</code>，MEM 级完全不知道它们从哪来</td></tr>
+<tr><td class="mono">mycpu_h.v</td>
+    <td><b>零改动</b>——乘法复用 <code>alu_op[12..14]</code>，除法用 3 位专用信号；
+        <code>DS_TO_ES</code> 因此在第 5 章只增加了 3 位</td></tr>
+</tbody>
+</table>
+
+<div class="box dang">
+<b>★ 坑 5：改了 <code>DS_TO_ES</code> 位宽，打包端与解包端必须同步逐位对齐。</b><br>
+这条坑在第 3–4 章讲义里已经提过，本章又来一次：
+EXE 级解包用的 <code>{...} = ds_to_es_bus_r</code> 如果少写一个字段、或多写一个 1 位，
+<b>综合不报错、仿真前期也可能不报错</b>，只在特定指令上算出莫名其妙的值。<br>
+铁律：<b>改一端立刻改另一端，并数一遍所有字段位宽之和是否等于宏定义的位宽。</b>
+本工程 <code>DS_TO_ES</code> 解包端的位宽注释是逐条标了 <code>1 bit / 6 bit / 14 bit ...</code> 的，
+就是为了能一眼加出来核对。
+</div>
+
+<!-- ======================= §7 ======================= -->
+<h2 id="s7">7 · 怎么验证 + 本项目实测结果</h2>
+
+<h3>7.1 两条通路（与第 3–4 章完全相同，这里只强调）</h3>
+
+<div class="kv">
+  <span class="k">行为仿真读</span><span><code>func/obj/inst_ram.mif</code>（<code>sync_ram.v</code> 行为级覆盖 IP）</span>
+  <span class="k">出 bit 读</span><span><code>func/obj/inst_ram.coe</code> → Xilinx IP → <b>OOC 综合生成的 <code>inst_ram.dcp</code></b></span>
+  <span class="k">换镜像必做</span><span><code>bash .workbuddy/sim/switch_exp.sh N</code>（一次同步三个位置）</span>
+  <span class="k">只 generate_target 不行</span><span>必须 <code>reset_run</code> + <code>launch_runs inst_ram_synth_1</code> 重烧 dcp</span>
+</div>
+
+<p class="small">完整的踩坑细节见<b>第 3–4 章讲义 §6</b>，此处不再重复。</p>
+
+<h3>7.2 一键命令</h3>
+
+<table>
+<thead><tr><th style="width:230px">想做什么</th><th class="mono">命令</th></tr></thead>
+<tbody>
+<tr><td>① 切换到 EXP7 镜像</td><td class="mono">bash .workbuddy/sim/switch_exp.sh 7</td></tr>
+<tr><td>② 重生成黄金 trace</td><td class="mono">vivado -mode batch -source .workbuddy/sim/gt_expN.tcl -tclargs 7</td></tr>
+<tr><td>③ 跑行为仿真</td><td class="mono">vivado -mode batch -source .workbuddy/sim/verify_expN_sim.tcl -tclargs 7</td></tr>
+<tr><td>④ 出 bit（约 13 分钟）</td><td class="mono">vivado -mode batch -source .workbuddy/sim/rebuild_bit_expN.tcl -tclargs 7</td></tr>
+</tbody>
+</table>
+
+<h3>7.3 实测结果（当前 RTL，实测）</h3>
+
+<table>
+<thead><tr><th style="width:90px">实验</th><th class="mono" style="width:130px">golden_trace 行数</th><th class="mono" style="width:120px">测试点 PASS</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><b>EXP7</b></td><td class="mono">86846</td><td class="mono"><b>46 / 46</b></td><td>第 5 章乘除；bit 已生成（<code>looongson_remote_top_EXP7.bit</code>）</td></tr>
+<tr><td>EXP4</td><td class="mono">62377</td><td class="mono">29 / 29</td><td>回归：第 3 章未被本章改动影响</td></tr>
+<tr><td>EXP5</td><td class="mono">71332</td><td class="mono">33 / 33</td><td>回归</td></tr>
+<tr><td>EXP6</td><td class="mono">79750</td><td class="mono">39 / 39</td><td>回归</td></tr>
+<tr><td>EXP8</td><td class="mono">87100</td><td class="mono">47 / 47</td><td>回归（第 6 章基础异常档）</td></tr>
+</tbody>
+</table>
+
+<h3>7.4 时序：这一章的"隐藏判分点"</h3>
+
+<p>乘法器搬出 <code>alu_result</code> 之后，时序彻底收敛。最近一次完整布线（50&nbsp;MHz 约束，周期 20&nbsp;ns）的汇总：</p>
+
+<div class="kv">
+  <span class="k">WNS</span><span><b>+0.782 ns</b>（Setup，正数表示有余量）</span>
+  <span class="k">WHS</span><span>+0.000 ns（Hold，全部满足）</span>
+  <span class="k">失败终点数</span><span><b>0</b> / 10606</span>
+  <span class="k">修复前</span><span>乘法器在 <code>alu_result</code> 锥里时，实测最长组合路径 <b>21~22 ns</b>，不收敛</span>
+</div>
+
+<div class="box ok">
+<b>汇报时这段可以这样讲：</b>"这一章的功能我一天就写完了，但时序调了四轮。
+根因是乘法器和前递链路共用了一个网，<b>只改多路选择器的选择端是无效的</b>，
+必须把乘法结果换到一条独立的数据通路上。这也说明<b>在 FPGA 上，逻辑正确不等于电路可跑</b>。"
+</div>
+
+<!-- ======================= §8 ======================= -->
+<h2 id="s8">8 · 汇报要点与老师常问的 8 个问题</h2>
+
+<h3>8.1 三分钟汇报骨架</h3>
+
+<ol>
+<li><b>先定位</b>：第 5 章是第一次"加硬件"——1 个 DSP48 乘法器 + 2 个 32 拍除法器；
+    难点不在算术，在<b>时序</b>和<b>多拍握手</b>。</li>
+<li><b>乘法</b>：<code>*</code> 一行出结果，映射到 DSP48；关键是<b>结果必须走独立通路</b>，
+    不能并进 <code>alu_result</code>，否则乘法器被吸进前递逻辑锥，跨三级长路径 21~22 ns。</li>
+<li><b>除法</b>：32 拍恢复余数法，绝对值域迭代 + 末拍按符号还原，天然得到"向零取整"；
+    <code>div/mod</code> 共用一次除法取不同半边；靠 <code>es_ready_go</code> 占住 EXE 34 拍。</li>
+<li><b>代价</b>：<code>mul_stall</code> 1 拍、<code>div_stall</code> 最多 34 拍；
+    五个 <code>*_stall</code> 用同一个模板，可维护。</li>
+<li><b>验证</b>：EXP7 = <b>46 个测试点</b>（第 5 章贡献 7 个、1060 组向量）全过；
+    WNS +0.782 ns、0 违例。</li>
+</ol>
+
+<h3>8.2 老师常问的 8 个问题</h3>
+
+<div class="box ask">
+<b>Q1：乘法器为什么直接用 <code>*</code>，不自己写部分积？</b><br>
+因为 Vivado 会把 32×32 的 <code>*</code> 直接映射到 Artix-7 的 <b>DSP48E1 硬核</b>：
+<b>几乎不耗 LUT、单周期出结果</b>。自己写部分积（比如基-4 Booth + Wallace 树）反而会
+铺满 LUT，挤占本来就很紧张的布线资源（本设计 BRAM 已占 87.67%）。
+<b>有硬核就用硬核，这是 FPGA 设计的常识。</b>
+</div>
+
+<div class="box ask">
+<b>Q2：为什么必须把乘法器搬出 <code>alu.v</code>？只改 MUX 行不行？</b><br>
+<b>不行。</b>静态时序分析看的是<b>逻辑锥</b>，不是"运行时会不会被选中"。
+只要乘法器的输出还挂在 <code>alu_result</code> 这条网上，它就是这个网的锥内逻辑，
+综合器剪不掉（因为 <code>op_mul</code> 是运行期信号、不是可优化的常量）。
+必须<b>在物理上换数据源</b>：让乘法结果根本不参与 <code>alu_result</code> 的计算，
+而是直接进 <code>es_final_result</code> → EXE→MEM 寄存器。
+</div>
+
+<div class="box ask">
+<b>Q3：那乘法结果还能前递吗？会不会影响性能？</b><br>
+不能从 EXE 级前递了（因为 <code>es_forward_data</code> 里刻意不含乘法器）。
+改用 <b>MEM 级前递</b>——下一拍乘法已进入 MEM，它的结果躺在
+<code>es_to_ms_bus_r</code> 触发器里，路径极短。
+代价是紧邻的依赖指令多停 1 拍（<code>mul_stall</code>）。
+<b>1 拍的代价换来时序收敛，完全值得</b>；而且编译器只要在乘法后面排一条无关指令就能吃掉这 1 拍。
+</div>
+
+<div class="box ask">
+<b>Q4：除法为什么不单周期做完？</b><br>
+除法本质是<b>串行试商</b>：每一位商都要判断"当前余数够不够减"，而这个判断依赖上一位的结果，
+没有常数级的组合实现。组合除法器需要约 32 级减法/比较串联，延迟远超 20 ns。
+所以用<b>时间换面积</b>：32 拍迭代，只占一个 33 位减法器，时序轻松。
+</div>
+
+<div class="box ask">
+<b>Q5：为什么选"恢复余数法"，不用"加减交替法"（不恢复余数）？</b><br>
+加减交替法每拍少一次"恢复"，但代价是每拍都要做一次<b>加或减</b>（由上一拍余数的符号决定），
+控制更绕，且最后可能要多一次"修正"步骤。<br>
+恢复余数法的"恢复"在本工程里<b>根本不需要真的加回去</b>——直接用 MUX 选回原值
+（<code>rem_next = rem_ge ? rem_shift - divisor : rem_shift</code>），
+代价只是一个 33 位 2 选 1，比一次加法便宜得多。<b>所以这里恢复余数法反而更简单。</b>
+</div>
+
+<div class="box ask">
+<b>Q6：有符号除法怎么处理？"向零取整"怎么保证？</b><br>
+分三步：① 进入时把被除数和除数<b>都取绝对值</b>；② 在绝对值域做 32 拍无符号迭代；
+③ 末拍按符号还原（取反加一）。<br>
+关键在于：<b>绝对值域的无符号整数除法本身就是截断的</b>（非负数上"向下"等于"向零"），
+所以 <code>−7 / 2</code> 走的是 <code>7/2 = 3</code>，加负号得 <code>−3</code>，正是 LA32R 要的结果。
+如果反过来在补码域直接迭代，会得到 floor 语义 <code>−4</code>，与手册不符。
+</div>
+
+<div class="box ask">
+<b>Q7：<code>div.w</code> 和 <code>mod.w</code> 要算两遍吗？为什么要例化两个除法器？</b><br>
+<b>不用算两遍。</b>恢复余数法在迭代过程中，商（<code>quo_r</code>）和余数（<code>rem_r</code>）
+是<b>同时</b>产生的——商逐位从低位补进去，余数就留在寄存器里。
+除法器输出 64 位：<code>[63:32]</code>=商、<code>[31:0]</code>=余数，
+<code>div</code> 取高半、<code>mod</code> 取低半，只差一个 MUX。<br>
+例化两个除法器<b>不是</b>为了 div/mod，而是为了<b>有符号/无符号</b>：
+<code>SIGNED</code> 是编译期参数（决定要不要插取绝对值和符号还原的逻辑），
+不能在运行期切换，所以只能各做一份。
+</div>
+
+<div class="box ask">
+<b>Q8：除数为 0 怎么办？为什么不触发异常？</b><br>
+LA32R 规定除 0 <b>不产生异常</b>，结果不可预测。本工程给出一个<b>确定但任意</b>的结果：
+除数绝对值 0 → <code>rem_ge</code> 恒真 → 商逐位全 1 = <code>0xFFFFFFFF</code>，余数不减 →
+余数 = 被除数。<br>
+这样做的工程意义是<b>不让 X 传播</b>：如果返回 <code>32'bx</code>，一旦被写进寄存器再参与运算，
+整条流水线都会变成 X，仿真时根本定位不到问题。<b>"确定的错值"比"不可控的 X"好得多。</b>
+</div>
+
+<hr>
+
+<p class="small center">—— 第 5 章讲义完 ——<br>
+配套：第 1–2 章讲义（流水线骨架与冲突处理）· 第 3–4 章讲义（算逻 / 转移 / 访存）<br>
+后续：第 6 章（异常、中断与 CSR 寄存器）</p>
+
+</div>
+</body>
+</html>

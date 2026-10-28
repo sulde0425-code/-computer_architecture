@@ -9,6 +9,13 @@ set PROJ "$ROOT/cdp_ede_local-master/mycpu_env/soc_verify/soc_bram/run_vivado/pr
 puts "================== EXP$EXP 行为仿真 =================="
 open_project "$PROJ/loongson.xpr"
 
+# 同步 myCPU 源文件：工程原始脚本是用"目录"方式 add_files 的，
+# 之后新增的 .v（例如第 6 章的 csr.v）不会被自动发现，会导致
+# elaborate 报 "Module <xxx> not found"。这里每跑一次都重新登记一遍。
+foreach f [glob -nocomplain "$ROOT/cdp_ede_local-master/mycpu_env/myCPU/*.v"] {
+    add_files -scan_for_includes -norecurse $f
+}
+
 if {[llength [get_ips -quiet inst_ram]] > 0} {
     reset_target all [get_ips inst_ram]
     generate_target all [get_ips inst_ram]

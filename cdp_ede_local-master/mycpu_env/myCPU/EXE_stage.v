@@ -25,7 +25,20 @@ module EXE_stage(
     output wire                         es_is_load,
     output wire                         es_is_div,      // 第 5 章：本级是除/取模指令
     output wire                         es_div_ready,   // 第 5 章：该除法结果已就绪
-    output wire                         es_is_mul       // 第 5 章：本级是乘法指令（结果只从 MEM 前递）
+    output wire                         es_is_mul,      // 第 5 章：本级是乘法指令（结果只从 MEM 前递）
+    output wire                         es_is_csr,      // 第 6 章：本级是 CSR 访问指令
+
+    // ---------------- 第 6 章：CSR 访问接口 ----------------
+    // 读写都在本级完成（指导书 6.5 建议：CSR 读写放同一流水级，避免写后读冲突）
+    output wire                         csr_re,
+    output wire [13:0]                  csr_num,
+    input  wire [31:0]                  csr_rvalue,
+    output wire                         csr_we,
+    output wire [31:0]                  csr_wmask,
+    output wire [31:0]                  csr_wvalue,
+
+    // 第 6 章：写回级报出异常 / ERTN 时的全局清空信号
+    input  wire                         flush
 );
 
     // ==========================================
@@ -46,6 +59,8 @@ module EXE_stage(
     always @(posedge clk) begin
         if (reset) begin
             es_valid <= 1'b0;
+        end else if (flush) begin
+            es_valid <= 1'b0;          // 第 6 章：异常/ERTN 时作废本级指令
         end else if (es_allowin) begin
             es_valid <= ds_to_es_valid;
         end
@@ -58,7 +73,13 @@ module EXE_stage(
     // ==========================================
     // 2. 解包 ID 传递过来的信号（与 ID_stage 打包顺序一致）
     // ==========================================
-    wire        es_spare;       // 保留位（第 6 章异常信息用）
+    wire        es_ertn;        // 第 6 章：ERTN 指令
+    wire [ 5:0] es_ex_flags;    // 第 6 章扩展档：异常标志组 {adef,ale,sys,brk,ine,int}
+    wire [13:0] es_csr_num;     // 第 6 章：CSR 寻址值
+    wire        es_csr_re;      // 第 6 章：CSR 读使能
+    wire        es_csr_we;      // 第 6 章：CSR 写使能
+    wire        es_csr_xchg;    // 第 6 章：csrxchg（写掩码取 rj 值）
+    wire        es_spare;       // 保留位
     wire [15:0] alu_op;
     wire        es_div_en;
     wire        es_div_signed;
@@ -75,6 +96,12 @@ module EXE_stage(
     wire [31:0] es_pc;
 
     assign {
+        es_ertn,         // 1 bit
+        es_ex_flags,     // 6 bit
+        es_csr_num,      // 14 bit
+        es_csr_re,       // 1 bit
+        es_csr_we,       // 1 bit
+        es_csr_xchg,     // 1 bit
         es_spare,        // 1 bit
         alu_op,          // 16 bit
         es_div_en,       // 1 bit
@@ -97,6 +124,27 @@ module EXE_stage(
     //     独热操作码 12/13/14 = mul.w / mulh.w / mulh.wu
     // ==========================================
     wire es_mul_inst = alu_op[12] | alu_op[13] | alu_op[14];
+
+    // ========================================================================
+    // 2c. 第 6 章：CSR 访问
+    //     csrrd/csrwr/csrxchg 三条指令都伴随一次"读 CSR 旧值"的动作，区别只在
+    //     要不要把 rd 的旧值写回 CSR、以及写掩码从哪来：
+    //       csrrd    ：wmask 无意义（不写），rd <- 旧值
+    //       csrwr    ：wmask = 全 1，      rd <- 旧值
+    //       csrxchg  ：wmask = rj 的值，   rd <- 旧值
+    //     写值一律是 rd 寄存器的旧值，它已经由 ID 级放到 alu_src2 上
+    //     （ID 级对这三条指令把第二个读口指向了 rd）；写掩码则复用 alu_src1（= rj）。
+    // ========================================================================
+    wire        es_csr_inst = es_csr_re;
+
+    assign csr_re    = es_valid && es_csr_re;
+    assign csr_num   = es_csr_num;
+    assign csr_wmask = es_csr_xchg ? es_alu_src1 : 32'hffffffff;
+    assign csr_wvalue= es_alu_src2;
+    // 只在指令真正流出 EXE 级的那一拍执行一次写入：
+    //   若 MEM 级反压（ms_allowin=0）指令原地停留，不会重复写；
+    //   若写回级正在 flush，说明本指令本不该执行，屏蔽掉写入。
+    assign csr_we    = es_valid && es_csr_we && es_ready_go && ms_allowin && !flush;
 
     // ==========================================
     // 3. 例化 ALU（16 位独热操作码，含乘法）
@@ -229,8 +277,27 @@ module EXE_stage(
     //      es_final_result  ：送 MEM/写回的最终结果（乘法 > 除法 > ALU），
     //                        乘法结果只出现在这里，终点是 EXE->MEM 寄存器。
     // ==========================================
+    // ==================================================================
+    // 5b. 第 6 章扩展档：地址非对齐异常 ALE（指导书 6.2.4）
+    //   判定放在"发起访存请求"这一级，这样发现异常时可以立刻用错误地址
+    //   停止访存 —— 与指导书的建议完全一致。
+    //   ID 级已经用地址低两位预判过一次（用于提前关闭流水线入口），
+    //   这里用真实的 alu_result 再复核一次并取或，双保险。
+    //     ld.w / st.w (size=4) ：要求 addr[1:0] == 00
+    //     ld.h / ld.hu / st.h (size=2)：要求 addr[0] == 0
+    //     ld.b / ld.bu / st.b (size=1)：任意地址都合法
+    // ==================================================================
+    wire es_ale_addr = (es_mem_size == 3'd4) ? (alu_result[1:0] != 2'b00) :
+                       (es_mem_size == 3'd2) ? (alu_result[   0] != 1'b0) : 1'b0;
+    wire es_ale      = es_ex_flags[4] | es_ale_addr;
+
     wire [31:0] es_forward_result = es_div_inst ? div_result : alu_result;
-    wire [31:0] es_final_result   = es_mul_inst ? mul_result : es_forward_result;
+    wire [31:0] es_alu_mul_result = es_mul_inst ? mul_result : es_forward_result;
+    // 第 6 章：CSR 访问指令的写回值是 CSR 读出的旧值
+    // 第 6 章扩展档：ALE 指令把出错的访存地址放进结果通路，
+    //   一路传到写回级当作 BADV.VAddr（省掉一条 32 位的专用总线）
+    wire [31:0] es_final_result   = es_ale      ? alu_result  :
+                                    es_csr_inst ? csr_rvalue  : es_alu_mul_result;
 
     // ==========================================
     // 6. 生成数据 RAM 访问信号
@@ -253,8 +320,11 @@ module EXE_stage(
     wire [31:0] es_store_wdata = (es_mem_size == 3'd1) ? wdata_byte :
                                  (es_mem_size == 3'd2) ? wdata_half : es_rkd_value;
 
-    assign data_sram_en    = es_valid && (es_res_from_mem || es_mem_we);
-    assign data_sram_we    = (es_valid && es_mem_we) ? es_store_we : 4'b0000;
+    // 第 6 章：写回级正在报异常 / ERTN 时，本级这条指令其实属于"不该执行"的
+    // 后续指令，必须屏蔽掉它的访存副作用，否则会污染内存。
+    // 第 6 章扩展档：出现 ALE 时不得用错误地址发起访存
+    assign data_sram_en    = es_valid && !flush && (es_res_from_mem || es_mem_we) && !es_ale;
+    assign data_sram_we    = (es_valid && !flush && es_mem_we && !es_ale) ? es_store_we : 4'b0000;
     assign data_sram_addr  = alu_result;
     assign data_sram_wdata = es_store_wdata;
 
@@ -262,12 +332,14 @@ module EXE_stage(
     // 7. 打包传递给 MEM 级
     // ==========================================
     assign es_to_ms_bus = {
+        es_ertn,         // 1 bit:  ERTN（随指令走到写回级触发 flush）
+        es_ex_flags,     // 6 bit:  异常标志组 {adef,ale,sys,brk,ine,int}
         es_res_from_mem, // 1 bit: 结果是否取自数据 RAM
         es_gr_we,        // 1 bit: 寄存器写使能
         es_mem_size,     // 3 bit: 访存宽度（MEM 做字节选择）
         es_ld_signed,    // 1 bit: 符号/零扩展
         es_dest,         // 5 bit: 写回目标寄存器号
-        es_final_result, // 32 bit: ALU / 除法结果（load 的写回值在 MEM 级产生）
+        es_final_result, // 32 bit: ALU / 除法 / CSR 读出值（load 的写回值在 MEM 级产生）
         es_pc            // 32 bit: 调试追踪 PC
     };
 
@@ -282,9 +354,14 @@ module EXE_stage(
     //    经 ID 分支比较/跳转目标加法器直抵 IF 取指地址，跨三级组合路径超时。
     // ==========================================
     assign es_is_mul = es_valid & es_mul_inst;
+    // 第 6 章：CSR 指令的结果来自 csr_rvalue，不在 es_forward_result 里，
+    // 因此不能参与本级前递 —— 否则前递出去的是 alu_result（alu_op 全 0 的垃圾值）。
+    // 对应的 RAW 冲突由 ID 级的 csr_stall 阻塞一拍解决。
+    assign es_is_csr = es_valid & es_csr_inst;
 
     assign es_forward_valid = es_valid && es_gr_we && (es_dest != 5'd0)
                             && !es_mul_inst
+                            && !es_csr_inst
                             && (!es_div_inst || es_div_ready);
     assign es_forward_dest  = es_dest;
     assign es_forward_data  = es_forward_result;

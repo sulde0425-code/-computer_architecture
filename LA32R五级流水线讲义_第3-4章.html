@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LA32R 五级流水线处理器 · 第 3–4 章讲义（实验二）</title>
+<style>
+  :root{
+    --ink:#2C2C2A; --ink2:#5F5E5A; --ink3:#888780;
+    --line:#E3E1DA; --line2:#D3D1C7;
+    --bg:#FFFFFF; --bg2:#F7F6F2; --bg3:#F1EFE8;
+    --blue:#185FA5; --blue-bg:#E6F1FB;
+    --teal:#0F6E56; --teal-bg:#E1F5EE;
+    --amber:#854F0B; --amber-bg:#FAEEDA;
+    --purple:#534AB7; --purple-bg:#EEEDFE;
+    --red:#A32D2D; --red-bg:#FCEBEB;
+    --green:#3B6D11; --green-bg:#EAF3DE;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg3);color:var(--ink);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       font-size:14.5px;line-height:1.75}
+  .wrap{max-width:940px;margin:0 auto;padding:32px 24px 80px}
+  header{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:28px 30px;margin-bottom:22px}
+  h1{margin:0 0 8px;font-size:23px;font-weight:600;letter-spacing:.3px}
+  .sub{color:var(--ink2);font-size:13.5px;margin:0}
+  h2{font-size:19px;font-weight:600;margin:34px 0 14px;padding-top:18px;border-top:1px solid var(--line2)}
+  h2:first-of-type{border-top:none;padding-top:0}
+  h3{font-size:16px;font-weight:600;margin:24px 0 10px}
+  h4{font-size:14.5px;font-weight:600;margin:18px 0 8px;color:var(--ink)}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;font-size:12.8px;
+       background:var(--bg3);padding:1px 5px;border-radius:4px;color:#3C3489}
+  pre{background:#FBFAF7;border:1px solid var(--line);border-left:3px solid var(--blue);
+      border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:12.8px;line-height:1.65;margin:12px 0}
+  pre code{background:none;padding:0;color:var(--ink);font-size:12.8px}
+  .cmt{color:#7A786F}
+  .kw{color:#993C1D;font-weight:600}
+  .sig{color:#185FA5;font-weight:600}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.2px;background:var(--bg)}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--bg3);font-weight:600;white-space:nowrap}
+  td.mono,th.mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:12.3px}
+  .box{border-radius:12px;padding:14px 18px;margin:16px 0;border:1px solid var(--line);background:var(--bg)}
+  .note{background:var(--blue-bg);border-color:#B5D4F4}
+  .warn{background:var(--amber-bg);border-color:#EF9F27}
+  .dang{background:var(--red-bg);border-color:#F09595}
+  .ok{background:var(--green-bg);border-color:#97C459}
+  .ask{background:var(--purple-bg);border-color:#AFA9EC}
+  .box b{font-weight:600}
+  .box p:first-child{margin-top:0}.box p:last-child{margin-bottom:0}
+  /* 位域排线图 */
+  .bits{display:flex;flex-wrap:wrap;gap:3px;margin:10px 0 6px;font-family:"SFMono-Regular",Consolas,monospace}
+  .bf{border:1px solid var(--line2);border-radius:4px;padding:4px 6px;font-size:11.4px;
+      background:var(--bg2);text-align:center;min-width:52px}
+  .bf .n{display:block;font-weight:600;color:var(--ink);font-size:11.8px}
+  .bf .r{display:block;color:var(--ink3);font-size:10.4px}
+  .bf.c1{background:var(--blue-bg);border-color:#85B7EB}
+  .bf.c2{background:var(--teal-bg);border-color:#5DCAA5}
+  .bf.c3{background:var(--amber-bg);border-color:#EF9F27}
+  .bf.c4{background:var(--purple-bg);border-color:#AFA9EC}
+  .bf.c5{background:var(--red-bg);border-color:#F09595}
+  .bf.c6{background:var(--green-bg);border-color:#97C459}
+  .bf.c0{background:#F1EFE8;border-color:#B4B2A9}
+  .fig{margin:18px 0;padding:14px;background:var(--bg);border:1px solid var(--line);border-radius:12px}
+  .fig svg{width:100%;height:auto;display:block}
+  .cap{font-size:12.4px;color:var(--ink3);margin-top:8px;text-align:center}
+  .tag{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:20px;
+       background:var(--bg3);color:var(--ink2);border:1px solid var(--line2);margin-right:4px}
+  .tag.ch3{background:var(--amber-bg);color:var(--amber);border-color:#EF9F27}
+  .tag.ch4{background:var(--teal-bg);color:var(--teal);border-color:#5DCAA5}
+  .tag.ch5{background:var(--amber-bg);color:var(--amber);border-color:#EF9F27}
+  .toc{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:16px 22px}
+  .toc ol{margin:6px 0;padding-left:20px}
+  .toc a{color:var(--blue);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13.4px;margin:10px 0}
+  .kv .k{color:var(--ink2);white-space:nowrap}
+  hr{border:none;border-top:1px solid var(--line);margin:26px 0}
+  .center{text-align:center}
+  .small{font-size:12.8px;color:var(--ink2)}
+  .quote{border-left:3px solid var(--purple);background:var(--purple-bg);border-radius:0 10px 10px 0;
+         padding:12px 18px;margin:12px 0;font-size:13.2px;line-height:1.72}
+  .quote p{margin:6px 0}
+  .quote .src{display:block;font-size:12px;color:var(--ink3);margin-top:8px}
+  /* 三卡并列 */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .card .t{font-weight:600;font-size:13.6px;margin-bottom:6px}
+  .card .d{font-size:12.8px;color:var(--ink2);line-height:1.65}
+  .card.b{border-top:3px solid var(--blue)} .card.b .t{color:var(--blue)}
+  .card.a{border-top:3px solid var(--amber)} .card.a .t{color:var(--amber)}
+  .card.g{border-top:3px solid var(--green)} .card.g .t{color:var(--green)}
+  @media(max-width:760px){.cards{grid-template-columns:1fr}}
+  @media print{body{background:#fff}.wrap{padding:0}h2{page-break-after:avoid}.fig,table,.box{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>LA32R 五级流水线处理器 · 第 3–4 章讲义（实验二）</h1>
+  <p class="sub">面向"计组基础薄弱、但要上台汇报"的同学 · 所有代码与信号均取自你工程里的真实 RTL<br>
+  对应指导书：第 3 章「算术逻辑转移类指令的添加」+ 第 4 章「访存指令的添加」　·　对应评测：EXP4 / EXP5 / EXP6</p>
+</header>
+
+<div class="toc">
+  <b>目录</b>
+  <ol>
+    <li><a href="#s0">学前预备：实验二到底在做什么</a></li>
+    <li><a href="#s1">第 3 章（上）· 算术逻辑类指令的添加</a></li>
+    <li><a href="#s2">第 3 章（下）· 转移指令 blt / bge / bltu / bgeu</a></li>
+    <li><a href="#s3">第 4 章 · 访存指令 ld.b / ld.h / ld.bu / ld.hu / st.b / st.h</a></li>
+    <li><a href="#s4">EXP4 / EXP5 / EXP6 各自测了什么（测试点全表）</a></li>
+    <li><a href="#s5">我们的工程：为这两章具体改了什么</a></li>
+    <li><a href="#s6">怎么验证：黄金 trace 比对 + 上板</a></li>
+    <li><a href="#s7">汇报要点与老师常问的 8 个问题</a></li>
+  </ol>
+</div>
+
+<!-- ======================= §0 ======================= -->
+<h2 id="s0">0 · 学前预备：实验二到底在做什么</h2>
+
+<p>上一份讲义（第 1–2 章 = 实验一）做的是<b>骨架</b>：五级怎么切、怎么握手、相关怎么解。
+这一份讲义讲<b>往骨架里填指令</b>——从 20 条基础指令扩展到 46 条（第 5 章乘除之前的规模）。</p>
+
+<div class="cards">
+  <div class="card b">
+    <div class="t">实验一（第 1–2 章）</div>
+    <div class="d">搭骨架：五级划分、握手规范、级间总线、前递与阻塞。<br>关键词：<b>结构</b></div>
+  </div>
+  <div class="card a">
+    <div class="t">实验二（第 3–4 章）</div>
+    <div class="d">填指令：9 条算逻 + 4 条转移 + 6 条访存。<br>关键词：<b>复用</b></div>
+  </div>
+  <div class="card g">
+    <div class="t">实验三（第 5–6 章）</div>
+    <div class="d">加部件：乘法器、除法器、CSR 与异常。<br>关键词：<b>扩展</b></div>
+  </div>
+</div>
+
+<div class="box ok">
+<b>本课最核心的一句话（请背下来，汇报时第一句就说它）</b><br>
+第 3、4 章<b>没有新增任何流水级，也没有新增运算部件</b>。
+<code>alu.v</code> 在这两章里<b>一行都没改</b>。
+要做的全部事情是：<b>让译码器多认 13 条指令，并把"宽度"和"符号"这两个维度补进访存通路</b>。
+</div>
+
+<p>指导书自己也是这么说的：</p>
+
+<div class="quote">
+<p>通过比较已经完成的 20 条指令，不难发现，这些指令在各个阶段均可以复用原本已经实现的指令的数据通路，
+然后对流水线上的所需使用的控制信号进行调整，增加部分信号即可。</p>
+<span class="src">——《计算机组成原理实验指导书》第 3 章 开篇</span>
+</div>
+
+<h3>0.1 三张清单：这一章总共就加了这些东西</h3>
+
+<table>
+<thead><tr><th style="width:150px">维度</th><th>第 3 章新增</th><th>第 4 章新增</th></tr></thead>
+<tbody>
+<tr><td><b>指令</b></td>
+    <td>slti、sltui、andi、ori、xori、sll.w、srl.w、sra.w、pcaddu12i、blt、bge、bltu、bgeu（13 条）</td>
+    <td>ld.b、ld.h、ld.bu、ld.hu、st.b、st.h（6 条）</td></tr>
+<tr><td><b>ALU 运算</b></td>
+    <td><b>无</b>——全部复用已有的 add/sub/slt/sltu/and/or/xor/sll/srl/sra/lui</td>
+    <td><b>无</b>——地址计算复用 add</td></tr>
+<tr><td><b>新增信号</b></td>
+    <td>立即数类型 need_si12 / need_ui12（need_ui5、si20 已有）</td>
+    <td><code>mem_size[2:0]</code>、<code>ld_signed</code>、汇总信号 <code>inst_ld_all</code> / <code>inst_st_all</code></td></tr>
+<tr><td><b>新增硬件</b></td>
+    <td>比较器 <code>rj_lt_rd</code>（有符号）/ <code>rj_ltu_rd</code>（无符号）</td>
+    <td>字节写使能译码 + 写数据复制；MEM 级字节选取 MUX + 扩展器</td></tr>
+</tbody>
+</table>
+
+<div class="box note">
+<b>为什么"复用"这么重要？</b>因为流水线的复杂度不在指令条数，而在<b>通路条数</b>。
+slti 和 slt 走同一条通路（同一个 ALU 操作、同一个写回口），差别只是<b>第二个操作数来自立即数还是寄存器</b>——
+这个差别在 ID 级就被 <code>src2_is_imm</code> 一个多路选择器吸收掉了，后面四级完全不知道有这回事。
+</div>
+
+<!-- ======================= §1 ======================= -->
+<h2 id="s1">1 · 第 3 章（上）· 算术逻辑类指令的添加</h2>
+
+<h3>1.1 指导书的实验要求</h3>
+
+<div class="quote">
+<p>■ 添加算术逻辑运算类指令 slti、sltui、andi、ori、xori、sll、srl、sra、pcaddu12i。运行对应的 func，要求成功通过仿真和上板验证。</p>
+<p>■ 添加转移指令 blt、bge、bltu、bgeu，运行对应的 func，要求成功通过仿真和上板验证。</p>
+<span class="src">——《计算机组成原理实验指导书》3.1 实验要求</span>
+</div>
+
+<p>注意两个关键词：<b>"运行对应的 func"</b>（不是自己随便写测试）和 <b>"仿真和上板"</b>（两条都要过）。
+后面 §6 会给出这两条通路各自吃哪个文件——这是本项目最容易翻车的地方。</p>
+
+<h3>1.2 九条算逻指令：编码与译码表达式</h3>
+
+<p>全部取自 <code>ID_stage.v</code> 的真实译码。LA32R 的算逻指令分两大族：</p>
+
+<h4>① 立即数族（opcode[31:26] = 0x00，靠 [25:22] 区分）</h4>
+
+<table>
+<thead><tr><th class="mono" style="width:110px">指令</th><th class="mono" style="width:120px">[25:22]</th><th>功能</th><th class="mono">译码表达式</th></tr></thead>
+<tbody>
+<tr><td class="mono">slti</td><td class="mono">0x8</td><td>rd ← (rj &lt;<sub>signed</sub> imm) ? 1 : 0</td><td class="mono">op_31_26_d[0x00] & op_25_22_d[0x8]</td></tr>
+<tr><td class="mono">sltui</td><td class="mono">0x9</td><td>rd ← (rj &lt;<sub>unsigned</sub> imm) ? 1 : 0</td><td class="mono">op_31_26_d[0x00] & op_25_22_d[0x9]</td></tr>
+<tr><td class="mono">andi</td><td class="mono">0xd</td><td>rd ← rj & imm</td><td class="mono">op_25_22_d[0xd]</td></tr>
+<tr><td class="mono">ori</td><td class="mono">0xe</td><td>rd ← rj | imm</td><td class="mono">op_25_22_d[0xe]</td></tr>
+<tr><td class="mono">xori</td><td class="mono">0xf</td><td>rd ← rj ^ imm</td><td class="mono">op_25_22_d[0xf]</td></tr>
+</tbody>
+</table>
+
+<h4>② 寄存器移位族（opcode = 0x00，[25:22]=0x0，[21:20]=0x1，靠 [19:15] 区分）</h4>
+
+<table>
+<thead><tr><th class="mono" style="width:110px">指令</th><th class="mono" style="width:120px">[19:15]</th><th>功能</th></tr></thead>
+<tbody>
+<tr><td class="mono">sll.w</td><td class="mono">0x0e</td><td>rd ← rj &lt;&lt; rk[4:0]</td></tr>
+<tr><td class="mono">srl.w</td><td class="mono">0x0f</td><td>rd ← rj &gt;&gt; rk[4:0]（逻辑）</td></tr>
+<tr><td class="mono">sra.w</td><td class="mono">0x10</td><td>rd ← rj &gt;&gt;&gt; rk[4:0]（算术）</td></tr>
+</tbody>
+</table>
+
+<h4>③ pcaddu12i（opcode = 0x07）</h4>
+
+<pre><code><span class="cmt">// pcaddu12i rd, si20  →  rd = PC + (SignExtend(si20) &lt;&lt; 12)</span>
+<span class="cmt">// lu12i.w   rd, si20  →  rd =          si20 &lt;&lt; 12</span>
+<span class="cmt">// 两者共用同一条立即数通路，区别只在 ALU 源操作数 1 是 PC 还是 0</span>
+<span class="kw">assign</span> inst_pcaddu12i = op_31_26_d[<span class="sig">6'h07</span>] &amp; ~ds_inst[<span class="sig">25</span>];
+<span class="kw">assign</span> src1_is_pc     = inst_jirl | inst_bl | inst_pcaddu12i;</code></pre>
+
+<div class="box warn">
+<b>★ 坑 1：pcaddu12i 和 lu12i.w 的 opcode 只差一位，而且都要看 inst[25]。</b><br>
+<code>lu12i.w</code> 是 <code>op=0x05 &amp; ~inst[25]</code>，<code>pcaddu12i</code> 是 <code>op=0x07 &amp; ~inst[25]</code>。
+如果不加 <code>~inst[25]</code> 这个限定，会误判成别的指令族。
+更典型的是第 6 章的 <code>ertn</code> 与 <code>tlbwr</code>：<code>06483800</code> 与 <code>06483000</code> 只差 bit12
+（见 §7 的 Q6）。
+</div>
+
+<h3>1.3 立即数扩展：第 3 章最容易写错的地方</h3>
+
+<p>LA32R 的立即数<b>不是统一的</b>，不同指令族格式完全不同。工程里用一组 <code>need_*</code> 信号先分类、再扩展：</p>
+
+<table>
+<thead><tr><th class="mono" style="width:90px">类型</th><th class="mono" style="width:80px">位宽</th><th>扩展方式</th><th class="mono">用在哪些指令</th></tr></thead>
+<tbody>
+<tr><td class="mono">si12</td><td>12</td><td><b>符号</b>扩展</td><td class="mono">addi.w、ld.*、st.*、slti、<b>sltui</b></td></tr>
+<tr><td class="mono">ui12</td><td>12</td><td><b>零</b>扩展</td><td class="mono">andi、ori、xori</td></tr>
+<tr><td class="mono">ui5</td><td>5</td><td><b>零</b>扩展（取自 rk 字段）</td><td class="mono">slli.w、srli.w、srai.w</td></tr>
+<tr><td class="mono">si20</td><td>20</td><td><b>符号</b>扩展后左移 12 位</td><td class="mono">lu12i.w、pcaddu12i</td></tr>
+<tr><td class="mono">si16</td><td>16</td><td><b>符号</b>扩展后左移 2 位</td><td class="mono">beq、bne、blt、bge、bltu、bgeu、jirl</td></tr>
+<tr><td class="mono">si26</td><td>26</td><td><b>符号</b>扩展后左移 2 位</td><td class="mono">b、bl</td></tr>
+</tbody>
+</table>
+
+<p>代码是一条<b>优先级链</b>（注意顺序不能乱）：</p>
+
+<pre><code><span class="kw">assign</span> need_si12 = inst_addi_w | inst_ld_all | inst_st_all | inst_slti | inst_sltui;
+<span class="kw">assign</span> need_si16 = inst_jirl | inst_beq | inst_bne | inst_blt | inst_bge | inst_bltu | inst_bgeu;
+<span class="kw">assign</span> need_si20 = inst_lu12i_w | inst_pcaddu12i;
+<span class="kw">assign</span> need_si26 = inst_b | inst_bl;
+<span class="kw">assign</span> src2_is_4 = inst_jirl | inst_bl;          <span class="cmt">// 链接地址 PC+4</span>
+
+<span class="cmt">// 立即数扩展：按"哪一种立即数"逐类处理，未命中的指令取 0</span>
+<span class="kw">assign</span> ds_imm = src2_is_4 ? <span class="sig">32'h4</span>                          <span class="cmt">// jirl/bl：链接值 PC+4</span>
+                : need_si20 ? {i20[<span class="sig">19:0</span>], <span class="sig">12'b0</span>}             <span class="cmt">// lu12i.w / pcaddu12i</span>
+                : need_ui5  ? {<span class="sig">27'b0</span>, rk[<span class="sig">4:0</span>]}                  <span class="cmt">// slli/srli/srai.w</span>
+                : need_ui12 ? {<span class="sig">20'b0</span>, i12[<span class="sig">11:0</span>]}                <span class="cmt">// andi / ori / xori</span>
+                : need_si12 ? {{<span class="sig">20</span>{i12[<span class="sig">11</span>]}}, i12[<span class="sig">11:0</span>]}        <span class="cmt">// addi/ld/st/slti/sltui</span>
+                :             <span class="sig">32'b0</span>;                          <span class="cmt">// 未译码指令：给 0，别用脏值</span></code></pre>
+
+<div class="box dang">
+<b>★ 坑 2（最容易错，没有之一）：<code>sltui</code> 的"u"是指比较无符号，不是立即数零扩展。</b><br>
+按龙芯架构手册，<code>sltui rd, rj, si12</code> 的立即数是 <b>si12</b>——<b>先符号扩展到 32 位</b>，
+然后才和 rj 做<b>无符号</b>比较。所以代码里 <code>inst_sltui</code> 挂在 <code>need_si12</code> 而不是 <code>need_ui12</code>。<br>
+如果照着"名字里有 u 就零扩展"的直觉写，那么当立即数为负数（如 <code>sltui v0, t0, 0xf80</code>）时，
+零扩展得到 0x00000f80，符号扩展得到 0xffffff80 —— 两者对 t0 的比较结果完全不同，
+而 func 测试里<b>专门有这种负值样例</b>（见 n22/n23 的测试数据），一测就红。
+</div>
+
+<div class="box note">
+<b>记忆口诀</b>：<b>andi/ori/xori 零扩展（ui12），其余 si12 全符号扩展</b>。
+理由：与/或/异或是<b>位操作</b>，立即数被当成"掩码"，零扩展最自然；
+其余指令的立即数被当成"数值"，所以符号扩展。
+</div>
+
+<h3>1.4 ALU：第 3 章零改动，但必须讲清独热码</h3>
+
+<p>这是汇报时的加分点。工程里的 ALU 用 <b>16 位独热操作码</b>，而不是常见的 4 位二进制编码：</p>
+
+<table>
+<thead><tr><th class="mono" style="width:70px">位</th><th class="mono" style="width:150px">运算</th><th class="mono">由哪些指令驱动</th></tr></thead>
+<tbody>
+<tr><td class="mono">0</td><td class="mono">add</td><td class="mono">add.w、addi.w、ld.*、st.*、jirl、bl、pcaddu12i</td></tr>
+<tr><td class="mono">1</td><td class="mono">sub</td><td class="mono">sub.w</td></tr>
+<tr><td class="mono">2</td><td class="mono">slt</td><td class="mono">slt、slti</td></tr>
+<tr><td class="mono">3</td><td class="mono">sltu</td><td class="mono">sltu、sltui</td></tr>
+<tr><td class="mono">4</td><td class="mono">and</td><td class="mono">and、andi</td></tr>
+<tr><td class="mono">5</td><td class="mono">nor</td><td class="mono">nor</td></tr>
+<tr><td class="mono">6</td><td class="mono">or</td><td class="mono">or、ori</td></tr>
+<tr><td class="mono">7</td><td class="mono">xor</td><td class="mono">xor、xori</td></tr>
+<tr><td class="mono">8</td><td class="mono">sll</td><td class="mono">slli.w、sll.w</td></tr>
+<tr><td class="mono">9</td><td class="mono">srl</td><td class="mono">srli.w、srl.w</td></tr>
+<tr><td class="mono">10</td><td class="mono">sra</td><td class="mono">srai.w、sra.w</td></tr>
+<tr><td class="mono">11</td><td class="mono">lui</td><td class="mono">lu12i.w</td></tr>
+<tr><td class="mono">12–14</td><td class="mono">mul.w / mulh.w / mulh.wu</td><td class="mono">第 5 章，<b>不在 alu.v 内实现</b></td></tr>
+</tbody>
+</table>
+
+<p>结果选择不用 <code>casez</code>，而是一棵<b>并行 "与-或" 树</b>：</p>
+
+<pre><code><span class="kw">assign</span> alu_result = ({<span class="sig">32</span>{op_add | op_sub}} &amp; add_sub_res)
+                  | ({<span class="sig">32</span>{op_slt}}          &amp; {<span class="sig">31'b0</span>, slt_res})
+                  | ({<span class="sig">32</span>{op_sltu}}         &amp; {<span class="sig">31'b0</span>, sltu_res})
+                  | ({<span class="sig">32</span>{op_and}}          &amp; and_res)
+                  | ... ;</code></pre>
+
+<div class="box ask">
+<b>老师可能问</b>："为什么用独热码？16 位不是浪费寄存器位宽吗？"<br>
+答：① 独热码下<b>每个运算部件各自算各自的</b>，结果用一个与-或树汇合，<b>没有优先编码链</b>，
+  关键路径 = 一个运算 + 一级与-或，比 4→16 译码后再选择短；
+  ② 位宽代价只在级间总线上（几十比特），换来的时序余量在 50MHz 下很值；
+  ③ 扩展性好——第 5 章加乘法只需占位 12–14，不动已有编码。
+<br><span class="small">⚠ 但也要注意：乘法器<b>不能</b>并进这棵与-或树，否则会被吸进前递逻辑锥（见第 5 章讲义）。</span>
+</div>
+
+<h3>1.4.1 一条指令的完整旅程（以 <code>slti v0, t0, 0xf80</code> 为例）</h3>
+
+<div class="fig">
+<svg viewBox="0 0 900 320" role="img" aria-label="slti 指令在五级流水线中的旅程">
+  <title>slti 指令的完整旅程</title>
+  <desc>从 IF 取指、ID 译码生成 imm 与 alu_op、EXE 比较、MEM 直通、WB 写回寄存器的全过程</desc>
+  <defs>
+    <marker id="ar3" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+      <path d="M0,0 L8,3.2 L0,6.4 z" fill="#534AB7"/>
+    </marker>
+  </defs>
+
+  <!-- 五个级 -->
+  <g font-size="12.6" text-anchor="middle">
+    <rect x="24"  y="60" width="150" height="90" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.6"/>
+    <text x="99"  y="84" font-weight="600" fill="#0B3D6B">IF 取指</text>
+    <text x="99"  y="104" fill="#5F5E5A">inst_sram_en</text>
+    <text x="99"  y="122" fill="#5F5E5A">inst_sram_addr=PC</text>
+    <text x="99"  y="140" fill="#5F5E5A">→ fs_inst</text>
+
+    <rect x="196" y="60" width="150" height="90" rx="10" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.6"/>
+    <text x="271" y="84" font-weight="600" fill="#5C3A05">ID 译码</text>
+    <text x="271" y="104" fill="#5F5E5A">need_si12 = 1</text>
+    <text x="271" y="122" fill="#5F5E5A">imm=SExt(0xf80)</text>
+    <text x="271" y="140" fill="#5F5E5A">alu_op[2]=1</text>
+
+    <rect x="368" y="60" width="150" height="90" rx="10" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.6"/>
+    <text x="443" y="84" font-weight="600" fill="#26215C">EXE 执行</text>
+    <text x="443" y="104" fill="#5F5E5A">ALU: rj &lt; imm</text>
+    <text x="443" y="122" fill="#5F5E5A">(有符号比较)</text>
+    <text x="443" y="140" fill="#5F5E5A">结果 0/1</text>
+
+    <rect x="540" y="60" width="150" height="90" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+    <text x="615" y="84" font-weight="600" fill="#04362C">MEM 访存</text>
+    <text x="615" y="106" fill="#5F5E5A">非 load</text>
+    <text x="615" y="126" fill="#5F5E5A">直通 final_result</text>
+
+    <rect x="712" y="60" width="164" height="90" rx="10" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.6"/>
+    <text x="794" y="84" font-weight="600" fill="#173404">WB 写回</text>
+    <text x="794" y="104" fill="#5F5E5A">rf_we=gr_we</text>
+    <text x="794" y="122" fill="#5F5E5A">waddr=rd</text>
+    <text x="794" y="140" fill="#5F5E5A">wdata=final_result</text>
+  </g>
+
+  <!-- 箭头 -->
+  <g stroke="#534AB7" stroke-width="1.5" fill="none" marker-end="url(#ar3)">
+    <path d="M178 105 L192 105"/>
+    <path d="M350 105 L364 105"/>
+    <path d="M522 105 L536 105"/>
+    <path d="M694 105 L708 105"/>
+  </g>
+
+  <!-- 下方说明带 -->
+  <rect x="24" y="180" width="852" height="112" rx="10" fill="#FBFAF7" stroke="#E3E1DA" stroke-width="0.6"/>
+  <text x="44" y="204" font-size="12.6" font-weight="600" fill="#2C2C2A">第 3 章为这条指令做的事，只有 ID 级里的三处：</text>
+  <text x="44" y="228" font-size="12.2" fill="#5F5E5A">① 译码器认出 slti：op_31_26==0x00 且 op_25_22==0x8</text>
+  <text x="44" y="250" font-size="12.2" fill="#5F5E5A">② 立即数走符号扩展：need_si12=1  →  imm = 0xffffff80</text>
+  <text x="44" y="272" font-size="12.2" fill="#5F5E5A">③ 复用已有 ALU 的 slt 通路：alu_op[2]=1（与 slt 完全一样）</text>
+</svg>
+<div class="cap">图 3A · 第 3 章的"复用"：新指令只是在 ID 级被翻译成已有通路的控制信号</div>
+</div>
+
+<h3>1.5 关键设计：<code>gr_we</code> 必须写成"正向或"</h3>
+
+<div class="box dang">
+<b>★ 坑 3：写回使能不能用"反向屏蔽"，必须用"正向列举"。</b><br>
+很多同学沿用的写法是 <code>gr_we = ~inst_st_w & ~inst_beq & ...</code>（把不写寄存器的指令排除掉）。
+这在指令集<b>固定不变</b>时没问题，但第 4 章新增 <code>ld.b</code> 时若忘了往屏蔽式里加，
+<code>ld.b</code> 就会带着 <code>gr_we=1</code>、<code>alu_op=0</code>（=add）走进默认通路，
+执行 <code>rd = rj + rk</code> 并写回 —— <b>不会报错，只是寄存器被静默改坏</b>，这种 bug 极难定位。
+</div>
+
+<pre><code><span class="cmt">// 正向译码：只有确实写通用寄存器的指令才置 gr_we</span>
+<span class="kw">assign</span> gr_we = inst_add_w  | inst_sub_w | inst_slt  | inst_sltu |
+               inst_nor    | inst_and   | inst_or   | inst_xor  |
+               inst_slli_w | inst_srli_w| inst_srai_w|
+               inst_addi_w | inst_lu12i_w |
+               inst_slti   | inst_sltui | inst_andi | inst_ori | inst_xori |
+               inst_pcaddu12i | inst_sll_w | inst_srl_w | inst_sra_w |
+               inst_jirl   | inst_bl    | <span class="sig">inst_ld_all</span> | ... ;</code></pre>
+
+<h3>1.6 同类指令的"汇总信号"</h3>
+
+<p>第 4 章一加就是 6 条访存指令，如果每条地方都写一遍 <code>inst_ld_w | inst_ld_b | ...</code>，
+漏一个就是 bug。工程里统一先汇总：</p>
+
+<pre><code><span class="kw">wire</span> inst_ld_all = inst_ld_w | inst_ld_b | inst_ld_h | inst_ld_bu | inst_ld_hu;
+<span class="kw">wire</span> inst_st_all = inst_st_w | inst_st_b | inst_st_h;
+
+<span class="cmt">// 之后所有地方只用汇总信号——新增指令只要改这一行</span>
+<span class="kw">assign</span> need_si12  = inst_addi_w | inst_ld_all | inst_st_all | inst_slti | inst_sltui;
+<span class="kw">assign</span> res_from_mem = inst_ld_all;
+<span class="kw">assign</span> mem_we       = inst_st_all;</code></pre>
+
+<div class="box ok">
+<b>这是一个可以主动讲的设计习惯</b>：指令集是<b>会增长的</b>（第 3 章加 13 条、第 4 章加 6 条、第 5 章加 8 条），
+所以任何"某类指令"的判定都应当收敛到一处。老师问"你怎么保证加指令不出错"时，这就是答案的一半，
+另一半是 §6 的自动化比对。
+</div>
+
+<h3>1.7 新字段在级间总线上的位置（排线图）</h3>
+
+<p>第 4 章真正"新增"的总线字段只有两个：<code>mem_size[2:0]</code> 和 <code>ld_signed</code>。
+下面是 <code>ds_to_es_bus</code>（ID→EXE，当前共 <b>179</b> 位）从高位到低位的完整排布，
+第 3/4 章相关的字段已着色：</p>
+
+<div class="bits">
+  <span class="bf c0"><span class="n">ertn</span><span class="r">[178]</span></span>
+  <span class="bf c0"><span class="n">ex_sys</span><span class="r">[177]</span></span>
+  <span class="bf c0"><span class="n">csr_num</span><span class="r">[176:163]</span></span>
+  <span class="bf c0"><span class="n">csr_re</span><span class="r">[162]</span></span>
+  <span class="bf c0"><span class="n">csr_we</span><span class="r">[161]</span></span>
+  <span class="bf c0"><span class="n">csr_xchg</span><span class="r">[160]</span></span>
+  <span class="bf c0"><span class="n">保留</span><span class="r">[159]</span></span>
+  <span class="bf c3"><span class="n">alu_op ★</span><span class="r">[158:143]</span></span>
+  <span class="bf c0"><span class="n">div_en</span><span class="r">[142]</span></span>
+  <span class="bf c0"><span class="n">div_sgn</span><span class="r">[141]</span></span>
+  <span class="bf c0"><span class="n">div_rem</span><span class="r">[140]</span></span>
+  <span class="bf c6"><span class="n">res_from_mem ★</span><span class="r">[139]</span></span>
+  <span class="bf c1"><span class="n">alu_src1</span><span class="r">[138:107]</span></span>
+  <span class="bf c1"><span class="n">alu_src2 ★</span><span class="r">[106:75]</span></span>
+  <span class="bf c6"><span class="n">gr_we ★</span><span class="r">[74]</span></span>
+  <span class="bf c6"><span class="n">mem_we ★</span><span class="r">[73]</span></span>
+  <span class="bf c5"><span class="n">mem_size ★</span><span class="r">[72:70]</span></span>
+  <span class="bf c5"><span class="n">ld_signed ★</span><span class="r">[69]</span></span>
+  <span class="bf c1"><span class="n">dest</span><span class="r">[68:64]</span></span>
+  <span class="bf c1"><span class="n">rkd_value</span><span class="r">[63:32]</span></span>
+  <span class="bf c1"><span class="n">ds_pc</span><span class="r">[31:0]</span></span>
+</div>
+
+<p class="small">颜色：<span class="tag ch3">第 3 章相关</span>alu_op 扩展（新指令复用已有运算）
+<span class="tag ch3">第 3 章相关</span>alu_src2 立即数通路（src2_is_imm）
+<span class="tag ch4">第 4 章新增</span>mem_size / ld_signed / res_from_mem / gr_we / mem_we
+灰色为第 1–2 章已有或第 5–6 章追加的字段。</p>
+
+<h4>EXE→MEM 总线（<code>es_to_ms_bus</code>，77 位）</h4>
+
+<p>注意 <code>mem_size</code> 与 <code>ld_signed</code> 必须<b>再传一级</b>到 MEM 级——
+字节选取和扩展是在 MEM 级做的，那里已经看不到译码器了。</p>
+
+<div class="bits">
+  <span class="bf c0"><span class="n">ertn</span><span class="r">[76]</span></span>
+  <span class="bf c0"><span class="n">ex_sys</span><span class="r">[75]</span></span>
+  <span class="bf c6"><span class="n">res_from_mem</span><span class="r">[74]</span></span>
+  <span class="bf c6"><span class="n">gr_we</span><span class="r">[73]</span></span>
+  <span class="bf c5"><span class="n">mem_size ★</span><span class="r">[72:70]</span></span>
+  <span class="bf c5"><span class="n">ld_signed ★</span><span class="r">[69]</span></span>
+  <span class="bf c1"><span class="n">dest</span><span class="r">[68:64]</span></span>
+  <span class="bf c1"><span class="n">final_result</span><span class="r">[63:32]</span></span>
+  <span class="bf c1"><span class="n">pc</span><span class="r">[31:0]</span></span>
+</div>
+
+<!-- ======================= §2 ======================= -->
+<h2 id="s2">2 · 第 3 章（下）· 转移指令 blt / bge / bltu / bgeu</h2>
+
+<h3>2.1 编码</h3>
+
+<table>
+<thead><tr><th class="mono" style="width:100px">指令</th><th class="mono" style="width:130px">opcode[31:26]</th><th>跳转条件</th><th class="mono">偏移格式</th></tr></thead>
+<tbody>
+<tr><td class="mono">beq</td><td class="mono">0x16</td><td>rj == rd</td><td class="mono">si16 &lt;&lt; 2</td></tr>
+<tr><td class="mono">bne</td><td class="mono">0x17</td><td>rj != rd</td><td class="mono">si16 &lt;&lt; 2</td></tr>
+<tr><td class="mono">blt</td><td class="mono">0x18</td><td>rj &lt; rd（<b>有符号</b>）</td><td class="mono">si16 &lt;&lt; 2</td></tr>
+<tr><td class="mono">bge</td><td class="mono">0x19</td><td>rj &gt;= rd（<b>有符号</b>）</td><td class="mono">si16 &lt;&lt; 2</td></tr>
+<tr><td class="mono">bltu</td><td class="mono">0x1a</td><td>rj &lt; rd（<b>无符号</b>）</td><td class="mono">si16 &lt;&lt; 2</td></tr>
+<tr><td class="mono">bgeu</td><td class="mono">0x1b</td><td>rj &gt;= rd（<b>无符号</b>）</td><td class="mono">si16 &lt;&lt; 2</td></tr>
+<tr><td class="mono">jirl</td><td class="mono">0x13</td><td>无条件，rd ← PC+4</td><td class="mono">si16 &lt;&lt; 2</td></tr>
+<tr><td class="mono">b / bl</td><td class="mono">0x14 / 0x15</td><td>无条件（bl：r1 ← PC+4）</td><td class="mono">si26 &lt;&lt; 2</td></tr>
+</tbody>
+</table>
+
+<pre><code><span class="kw">assign</span> inst_blt  = op_31_26_d[<span class="sig">6'h18</span>];
+<span class="kw">assign</span> inst_bge  = op_31_26_d[<span class="sig">6'h19</span>];
+<span class="kw">assign</span> inst_bltu = op_31_26_d[<span class="sig">6'h1a</span>];
+<span class="kw">assign</span> inst_bgeu = op_31_26_d[<span class="sig">6'h1b</span>];</code></pre>
+
+<h3>2.2 比较逻辑：有符号 / 无符号只差一个 <code>$signed</code></h3>
+
+<pre><code><span class="kw">assign</span> rj_eq_rd  = (rj_br_value  == rkd_br_value);
+<span class="kw">wire</span>   rj_lt_rd  = (<span class="sig">$signed</span>(rj_br_value) &lt; <span class="sig">$signed</span>(rkd_br_value));  <span class="cmt">// 有符号</span>
+<span class="kw">wire</span>   rj_ltu_rd = (rj_br_value  &lt; rkd_br_value);                  <span class="cmt">// 无符号</span></code></pre>
+
+<p>然后<b>只用两个比较结果</b>拼出全部六条条件转移：</p>
+
+<pre><code><span class="kw">assign</span> br_taken = (inst_beq  &amp;&amp;  rj_eq_rd
+                || inst_bne  &amp;&amp; !rj_eq_rd
+                || inst_blt  &amp;&amp;  rj_lt_rd
+                || inst_bge  &amp;&amp; !rj_lt_rd        <span class="cmt">// 取反即得 &gt;=</span>
+                || inst_bltu &amp;&amp;  rj_ltu_rd
+                || inst_bgeu &amp;&amp; !rj_ltu_rd       <span class="cmt">// 取反即得 &gt;=u</span>
+                || inst_jirl || inst_bl || inst_b
+                ) &amp;&amp; ds_valid &amp;&amp; ds_ready_go;</code></pre>
+
+<div class="box note">
+<b>为什么不直接写 <code>&gt;=</code>？</b>两个理由：<br>
+① <b>省硬件</b>：<code>&gt;=</code> 会再实例化一个比较器，而 <code>!&lt;</code> 复用同一个比较结果，只多一个反相器；<br>
+② <b>避免溢出边角</b>：补码比较里"取反小于"与"大于等于"在数学上完全等价（全序），
+但硬件实现上少一条路径就少一处可能写错的边界。<br>
+<span class="small">整数比较是全序，所以 <code>!(a&lt;b) ≡ a&gt;=b</code> 恒成立；浮点因为有 NaN 才不能这么写——但本设计没有浮点。</span>
+</div>
+
+<h3>2.3 分支在 ID 级闭环：跳转只有 <b>1 拍</b> penalty</h3>
+
+<div class="fig">
+<svg viewBox="0 0 900 300" role="img" aria-label="分支在译码级闭环">
+  <title>分支在 ID 级闭环</title>
+  <desc>分支比较与转移目标计算都在 ID 级完成，br_bus 直接回送 IF 级，因此跳转惩罚只有一拍</desc>
+  <defs>
+    <marker id="ar4" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+      <path d="M0,0 L8,3.2 L0,6.4 z" fill="#A32D2D"/>
+    </marker>
+    <marker id="ar5" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+      <path d="M0,0 L8,3.2 L0,6.4 z" fill="#185FA5"/>
+    </marker>
+  </defs>
+
+  <!-- 上方流水线 -->
+  <g font-size="12.4" text-anchor="middle">
+    <rect x="40"  y="40" width="140" height="70" rx="10" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.6"/>
+    <text x="110" y="64" font-weight="600" fill="#0B3D6B">IF</text>
+    <text x="110" y="86" fill="#5F5E5A">fs_pc / fs_inst</text>
+
+    <rect x="230" y="40" width="420" height="70" rx="10" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.6"/>
+    <text x="440" y="64" font-weight="600" fill="#5C3A05">ID —— 分支在这里全部解决完</text>
+    <text x="440" y="86" fill="#5F5E5A">rj_eq_rd / rj_lt_rd / rj_ltu_rd →  br_taken ；br_target = ds_pc + SExt(imm)&lt;&lt;2</text>
+  </g>
+
+  <path d="M184 75 L226 75" stroke="#185FA5" stroke-width="1.5" fill="none" marker-end="url(#ar5)"/>
+
+  <!-- 回送弧 -->
+  <path d="M660 110 C 660 190, 130 190, 118 118" stroke="#A32D2D" stroke-width="1.8" fill="none" marker-end="url(#ar4)"/>
+  <text x="400" y="196" font-size="12.6" font-weight="600" text-anchor="middle" fill="#A32D2D">br_bus = {br_taken, br_target}　直送 IF 级 → 下一拍就取到新 PC 的指令</text>
+
+  <!-- 说明 -->
+  <rect x="40" y="222" width="820" height="60" rx="10" fill="#FBFAF7" stroke="#E3E1DA" stroke-width="0.6"/>
+  <text x="60" y="246" font-size="12.2" fill="#5F5E5A">代价：分支发生时要作废已经取进来的那条顺序指令（"取消"）。</text>
+  <text x="60" y="268" font-size="12.2" fill="#5F5E5A">LA32R <b>没有延迟槽</b>，所以这条指令<b>本来就不该执行</b>——直接作废即可，无需补偿。</text>
+</svg>
+<div class="cap">图 3B · 分支闭环：比较 + 目标地址都在 ID 级完成，代价是 1 拍气泡</div>
+</div>
+
+<h3>2.4 分支的两个隐藏依赖（必须处理，否则功能错）</h3>
+
+<h4>① 分支的比较操作数也要走前递</h4>
+
+<p>分支在 ID 级比较 <code>rj</code> 与 <code>rd</code>，如果上一条指令正要写这两个寄存器，
+就必须前递，否则比的是旧值。工程里专门为分支铺了<b>第二条前递通路</b>：</p>
+
+<pre><code><span class="cmt">// EXE &gt; MEM &gt; WB &gt; 寄存器堆，优先级与通用通路一致</span>
+<span class="kw">wire</span> [<span class="sig">31:0</span>] rj_br_value =
+    (es_forward_valid &amp;&amp; ds_use_rj &amp;&amp; (es_forward_dest == rf_raddr1)) ? es_forward_data :
+    (ms_br_fwd_ok     &amp;&amp; ds_use_rj &amp;&amp; (ms_forward_dest == rf_raddr1)) ? <span class="sig">ms_forward_data_alu</span> :
+    (ws_forward_valid &amp;&amp; ds_use_rj &amp;&amp; (ws_forward_dest == rf_raddr1)) ? ws_forward_data :
+                                                                          rf_rdata1;</code></pre>
+
+<h4>② 分支 + Load-Use：多等一拍（<code>branch_load_stall</code>）</h4>
+
+<p>普通的 Load-Use 阻塞只在"<b>EXE 级</b>是 load"时生效。但还有一种情况：
+load 已经走到 <b>MEM 级</b>，此时它的数据来自 <code>data_sram</code>（BRAM 输出），
+如果直接前递给分支去比较，会连成一条
+<code>data_ram(BRAM) → 字节扩展 → ID 前递 → 分支比较 → IF 取指地址 → inst_ram</code> 的超长组合路径
+（实测 <b>20.21ns</b>，@50MHz 只有 20ns，<b>不收敛</b>）。</p>
+
+<pre><code><span class="cmt">// ① 功能层面：分支一律不消费"MEM 级 load"的前递值</span>
+<span class="kw">wire</span> mem_fwd_ok = ms_forward_valid &amp;&amp; !(ds_is_branch &amp;&amp; ms_forward_is_load);
+
+<span class="cmt">// ② 物理层面：分支在 MEM 级改取 ms_forward_data_alu（发自触发器，与 BRAM 无关）</span>
+<span class="kw">wire</span> ms_br_fwd_ok = ms_forward_valid &amp;&amp; !ms_forward_is_load;
+
+<span class="cmt">// ③ 时序上让分支多等一拍，下一拍由 WB 级 ws_forward 提供结果</span>
+<span class="kw">assign</span> branch_load_stall = ds_is_branch &amp;&amp; ms_forward_valid &amp;&amp; ms_forward_is_load &amp;&amp; (
+    (ds_use_rj  &amp;&amp; (rf_raddr1 != <span class="sig">5'd0</span>) &amp;&amp; (rf_raddr1 == ms_forward_dest)) ||
+    (ds_use_rkd &amp;&amp; (rf_raddr2 != <span class="sig">5'd0</span>) &amp;&amp; (rf_raddr2 == ms_forward_dest)));</code></pre>
+
+<div class="box warn">
+<b>这里有一个非常值得在汇报时强调的工程经验</b>：<br>
+<b>"功能上不选"和"物理上切断"是两件事，必须成对做。</b>
+实测只加 <code>branch_load_stall</code>（功能上不选）时，违例端点从 752 降到 371、TNS 从 −282ns 降到 −124ns，
+但 <b>WNS 纹丝不动（−1.26ns）</b>——因为只要 <code>ms_forward_data</code> 仍是多路选择器的数据输入，
+静态时序分析就会照常分析这条路径。必须<b>换数据源</b>（改用 <code>ms_forward_data_alu</code>），
+让逻辑锥的起点从 BRAM 变成触发器，路径才真正断开。
+</div>
+
+<!-- ======================= §3 ======================= -->
+<h2 id="s3">3 · 第 4 章 · 访存指令的添加</h2>
+
+<h3>3.1 指导书的实验要求</h3>
+
+<div class="quote">
+<p><b>4.1　st.b 和 st.h 指令的添加</b><br>
+实现的关键在于控制如何实现字节或者半字的写入。显然是通过字节写使能来实现的。
+例如 st.b 是写入一个字节的数据，所以他的写使能需要根据 vaddr 的最后两位进行判断。<br>
+　　00 → 0001　　01 → 0010　　10 → 0100　　11 → 1000<br>
+st.h 指令同理，最后只需要生成写数据即可。　　00 → 0011　　10 → 1100</p>
+<p><b>4.2　ld.b、ld.h、ld.bu、ld.hu 指令的添加</b><br>
+分析与 ld.w 指令之间的异同：<br>
+■ 他们之间的计算虚地址，操作数来源，虚实地址映射的方法规则是完全一样的<br>
+■ 访存结果都写回 rd 项寄存器<br>
+■ 差异仅仅是写回的数据的位宽是不同的<br>
+……唯一需要考虑的是如何从数据 RAM 中选择出所需要的内容，可以通过一个多路选择器去实现，
+选择信号是根据指令的访存地址的<b>最低两位</b>以及访存操作的类型信息共同决定的。<br>
+<b>不要忘记将取回内容扩展至 32 位，记得判断是符号扩展还是零扩展。</b></p>
+<span class="src">——《计算机组成原理实验指导书》第 4 章</span>
+</div>
+
+<h3>3.2 编码</h3>
+
+<table>
+<thead><tr><th class="mono" style="width:100px">指令</th><th class="mono" style="width:110px">opcode[31:26]</th><th class="mono" style="width:110px">[25:22]</th><th>功能</th><th class="mono" style="width:90px">扩展</th></tr></thead>
+<tbody>
+<tr><td class="mono">ld.b</td><td class="mono">0x0a</td><td class="mono">0x0</td><td>rd ← 字节</td><td>符号</td></tr>
+<tr><td class="mono">ld.h</td><td class="mono">0x0a</td><td class="mono">0x1</td><td>rd ← 半字</td><td>符号</td></tr>
+<tr><td class="mono">ld.w</td><td class="mono">0x0a</td><td class="mono">0x2</td><td>rd ← 字</td><td>—</td></tr>
+<tr><td class="mono">st.b</td><td class="mono">0x0a</td><td class="mono">0x4</td><td>存字节</td><td>—</td></tr>
+<tr><td class="mono">st.h</td><td class="mono">0x0a</td><td class="mono">0x5</td><td>存半字</td><td>—</td></tr>
+<tr><td class="mono">st.w</td><td class="mono">0x0a</td><td class="mono">0x6</td><td>存字</td><td>—</td></tr>
+<tr><td class="mono">ld.bu</td><td class="mono">0x0a</td><td class="mono">0x8</td><td>rd ← 字节</td><td>零</td></tr>
+<tr><td class="mono">ld.hu</td><td class="mono">0x0a</td><td class="mono">0x9</td><td>rd ← 半字</td><td>零</td></tr>
+</tbody>
+</table>
+
+<p>工程里用两个汇总信号把它们收拢（见 §1.6），并把"宽度 / 符号"编码成两比特级的字段：</p>
+
+<pre><code><span class="kw">wire</span> [<span class="sig">2:0</span>] ds_mem_size = (inst_ld_b | inst_ld_bu | inst_st_b) ? <span class="sig">3'd1</span> :
+                             (inst_ld_h | inst_ld_hu | inst_st_h) ? <span class="sig">3'd2</span> : <span class="sig">3'd4</span>;
+<span class="kw">wire</span>       ds_ld_signed = inst_ld_b | inst_ld_h;</code></pre>
+
+<div class="box note">
+<b>为什么要编码成 <code>mem_size=1/2/4</code> 而不是直接传指令信号？</b><br>
+因为 <b>MEM 级离译码器有两级之远</b>，把 6 条指令的信号一路传过去既占位宽又容易漏；
+编码成 3 位"宽度"后，MEM 级只需要关心 <code>size</code> 和 <code>signed</code> 两个字段，
+将来再加 <code>ld.wu</code> 之类也不用改 MEM 级。
+</div>
+
+<h3>3.3 Store 通路：字节写使能 + 写数据"复制"</h3>
+
+<p>关键在于两点：<b>用地址低两位生成 4 位字节写使能</b>；<b>写数据复制到对应通道</b>。</p>
+
+<pre><code><span class="kw">wire</span> [<span class="sig">1:0</span>] es_addr_low = alu_result[<span class="sig">1:0</span>];
+
+<span class="kw">wire</span> [<span class="sig">3:0</span>] we_byte = <span class="sig">4'b0001</span> &lt;&lt; es_addr_low;            <span class="cmt">// st.b</span>
+<span class="kw">wire</span> [<span class="sig">3:0</span>] we_half = es_addr_low[<span class="sig">1</span>] ? <span class="sig">4'b1100</span> : <span class="sig">4'b0011</span>;  <span class="cmt">// st.h</span>
+<span class="kw">wire</span> [<span class="sig">3:0</span>] we_word = <span class="sig">4'b1111</span>;                           <span class="cmt">// st.w</span>
+
+<span class="kw">wire</span> [<span class="sig">31:0</span>] wdata_byte = {<span class="sig">4</span>{es_rkd_value[<span class="sig">7:0</span>]}};       <span class="cmt">// 字节复制 4 份</span>
+<span class="kw">wire</span> [<span class="sig">31:0</span>] wdata_half = {<span class="sig">2</span>{es_rkd_value[<span class="sig">15:0</span>]}};      <span class="cmt">// 半字复制 2 份</span>
+
+<span class="kw">wire</span> [<span class="sig">3:0</span>]   es_store_we    = (es_mem_size == <span class="sig">3'd1</span>) ? we_byte :
+                                 (es_mem_size == <span class="sig">3'd2</span>) ? we_half : we_word;
+<span class="kw">wire</span> [<span class="sig">31:0</span>] es_store_wdata = (es_mem_size == <span class="sig">3'd1</span>) ? wdata_byte :
+                                 (es_mem_size == <span class="sig">3'd2</span>) ? wdata_half : es_rkd_value;</code></pre>
+
+<div class="fig">
+<svg viewBox="0 0 900 300" role="img" aria-label="store 字节写使能与写数据复制">
+  <title>st.b / st.h 的字节写使能</title>
+  <desc>地址低两位译码成 4 位字节写使能，写数据复制到全部通道，由写使能挑选落点</desc>
+
+  <!-- 地址低两位 -->
+  <text x="40" y="52" font-size="12.8" font-weight="600" fill="#2C2C2A">访存地址 alu_result[1:0]</text>
+  <g font-size="12" text-anchor="middle">
+    <rect x="40"  y="66" width="60" height="34" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+    <text x="70"  y="88">00</text>
+    <rect x="108" y="66" width="60" height="34" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+    <text x="138" y="88">01</text>
+    <rect x="176" y="66" width="60" height="34" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+    <text x="206" y="88">10</text>
+    <rect x="244" y="66" width="60" height="34" rx="6" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+    <text x="274" y="88">11</text>
+  </g>
+
+  <!-- st.b 行 -->
+  <text x="40" y="140" font-size="12.4" font-weight="600" fill="#993C1D">st.b　we = 4'b0001 &lt;&lt; addr[1:0]</text>
+  <g font-size="11.6" text-anchor="middle">
+    <rect x="40"  y="150" width="60" height="32" rx="6" fill="#FCEBEB" stroke="#F09595" stroke-width="0.5"/>
+    <text x="70"  y="171">0001</text>
+    <rect x="108" y="150" width="60" height="32" rx="6" fill="#FCEBEB" stroke="#F09595" stroke-width="0.5"/>
+    <text x="138" y="171">0010</text>
+    <rect x="176" y="150" width="60" height="32" rx="6" fill="#FCEBEB" stroke="#F09595" stroke-width="0.5"/>
+    <text x="206" y="171">0100</text>
+    <rect x="244" y="150" width="60" height="32" rx="6" fill="#FCEBEB" stroke="#F09595" stroke-width="0.5"/>
+    <text x="274" y="171">1000</text>
+  </g>
+
+  <!-- st.h 行 -->
+  <text x="40" y="216" font-size="12.4" font-weight="600" fill="#993C1D">st.h　we = addr[1] ? 1100 : 0011</text>
+  <g font-size="11.6" text-anchor="middle">
+    <rect x="40"  y="226" width="128" height="32" rx="6" fill="#FCEBEB" stroke="#F09595" stroke-width="0.5"/>
+    <text x="104" y="247">0011（addr[1]=0）</text>
+    <rect x="176" y="226" width="128" height="32" rx="6" fill="#FCEBEB" stroke="#F09595" stroke-width="0.5"/>
+    <text x="240" y="247">1100（addr[1]=1）</text>
+  </g>
+
+  <!-- 右侧说明 -->
+  <rect x="420" y="66" width="440" height="192" rx="12" fill="#FBFAF7" stroke="#E3E1DA" stroke-width="0.6"/>
+  <text x="444" y="94" font-size="12.6" font-weight="600" fill="#2C2C2A">为什么写数据要"复制"而不是"移位"？</text>
+  <text x="444" y="120" font-size="12.2" fill="#5F5E5A">st.b 要把 rkd[7:0] 写到 addr[1:0] 指定的那个字节。</text>
+  <text x="444" y="142" font-size="12.2" fill="#5F5E5A">做法 A：按 addr 动态左移 8×addr[1:0] 位 → 需要一个</text>
+  <text x="444" y="162" font-size="12.2" fill="#5F5E5A">　　　　桶形移位器，32 位宽、延迟不小。</text>
+  <text x="444" y="188" font-size="12.2" fill="#5F5E5A">做法 B（本工程）：把字节复制 4 份铺满 32 位，</text>
+  <text x="444" y="208" font-size="12.2" fill="#5F5E5A">　　　　再由 we 挑选落到哪个通道 → <b>零逻辑</b>。</text>
+  <text x="444" y="234" font-size="12.2" fill="#5F5E5A">半字同理：复制 2 份，we=0011 或 1100。</text>
+</svg>
+<div class="cap">图 4A · 字节写使能：地址低两位决定通道，写数据靠"复制"免掉移位器</div>
+</div>
+
+<div class="box ok">
+<b>对齐说明</b>：st.h 的合法地址要求 <code>addr[1:0]</code> 为 00 或 10（半字对齐），
+所以译码只区分 <code>addr[1]</code>；st.b 任意字节地址都合法，所以要用完整的 <code>addr[1:0]</code>。
+（<b>地址非对齐异常 ALE</b> 属于第 6 章扩展档，本课设的 EXP4/5/6 不检测。）
+</div>
+
+<h3>3.4 Load 通路：字节选取 + 符号/零扩展</h3>
+
+<p>为什么必须在 <b>MEM 级</b>做？因为数据 RAM 是同步读：<b>EXE 级发出地址 → MEM 级才拿得到 <code>data_sram_rdata</code></b>。
+所以"从整字里挑出需要的字节/半字，再扩展到 32 位"这一步只能放在 MEM 级。</p>
+
+<pre><code><span class="kw">wire</span> [<span class="sig">1:0</span>] ms_addr_low = ms_alu_result[<span class="sig">1:0</span>];
+
+<span class="cmt">// ① 字节选取：00/01/10/11 → byte0/1/2/3（小端）</span>
+<span class="kw">wire</span> [<span class="sig">7:0</span>] ld_byte = (ms_addr_low == <span class="sig">2'b00</span>) ? data_sram_rdata[<span class="sig"> 7: 0</span>] :
+                          (ms_addr_low == <span class="sig">2'b01</span>) ? data_sram_rdata[<span class="sig">15: 8</span>] :
+                          (ms_addr_low == <span class="sig">2'b10</span>) ? data_sram_rdata[<span class="sig">23:16</span>] :
+                                                     data_sram_rdata[<span class="sig">31:24</span>];
+<span class="cmt">// ② 半字选取：addr[1]=0 取低半字，=1 取高半字</span>
+<span class="kw">wire</span> [<span class="sig">15:0</span>] ld_half = ms_addr_low[<span class="sig">1</span>] ? data_sram_rdata[<span class="sig">31:16</span>]
+                                           : data_sram_rdata[<span class="sig">15: 0</span>];
+
+<span class="cmt">// ③ 按 size 选通路 + 按 signed 选扩展方式</span>
+<span class="kw">wire</span> [<span class="sig">31:0</span>] mem_load_data = (ms_mem_size == <span class="sig">3'd1</span>) ?
+                                    (ms_ld_signed ? {{<span class="sig">24</span>{ld_byte[<span class="sig">7</span>]}},  ld_byte}  <span class="cmt">// 符号</span>
+                                                  : {<span class="sig">24'b0</span>,            ld_byte}) <span class="cmt">// 零</span>
+                                : (ms_mem_size == <span class="sig">3'd2</span>) ?
+                                    (ms_ld_signed ? {{<span class="sig">16</span>{ld_half[<span class="sig">15</span>]}}, ld_half}
+                                                  : {<span class="sig">16'b0</span>,            ld_half})
+                                :   data_sram_rdata;   <span class="cmt">// 字访问直接取整字</span>
+
+<span class="kw">wire</span> [<span class="sig">31:0</span>] ms_final_result = ms_res_from_mem ? mem_load_data : ms_alu_result;</code></pre>
+
+<div class="fig">
+<svg viewBox="0 0 900 260" role="img" aria-label="load 字节选取与扩展">
+  <title>ld.b / ld.h / ld.bu / ld.hu 的选取与扩展</title>
+  <desc>整字按地址低两位选出字节或半字，再按 signed 位做符号或零扩展到 32 位</desc>
+
+  <!-- 整字 -->
+  <rect x="40" y="60" width="360" height="52" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.6"/>
+  <text x="220" y="82" font-size="12.4" font-weight="600" text-anchor="middle" fill="#0B3D6B">data_sram_rdata[31:0]</text>
+  <g font-size="11.4" text-anchor="middle" fill="#5F5E5A">
+    <text x="85"  y="102">byte3</text>
+    <text x="175" y="102">byte2</text>
+    <text x="265" y="102">byte1</text>
+    <text x="355" y="102">byte0</text>
+  </g>
+
+  <!-- 箭头 -->
+  <path d="M404 86 L470 86" stroke="#534AB7" stroke-width="1.5" fill="none" marker-end="url(#ar3b)"/>
+  <defs><marker id="ar3b" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+    <path d="M0,0 L8,3.2 L0,6.4 z" fill="#534AB7"/></marker></defs>
+
+  <!-- MUX -->
+  <polygon points="480,52 620,52 640,86 620,120 480,120" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.6"/>
+  <text x="546" y="80" font-size="12" font-weight="600" text-anchor="middle" fill="#5C3A05">选取 MUX</text>
+  <text x="546" y="98" font-size="11.2" text-anchor="middle" fill="#5F5E5A">sel = addr[1:0]</text>
+
+  <!-- 扩展 -->
+  <rect x="668" y="52" width="192" height="68" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.6"/>
+  <text x="764" y="76" font-size="12" font-weight="600" text-anchor="middle" fill="#04362C">扩展到 32 位</text>
+  <text x="764" y="96" font-size="11.4" text-anchor="middle" fill="#5F5E5A">signed ? {{24{b[7]}},b}</text>
+  <text x="764" y="112" font-size="11.4" text-anchor="middle" fill="#5F5E5A">　　　 : {24'b0, b}</text>
+
+  <text x="40" y="176" font-size="12.4" fill="#2C2C2A"><tspan font-weight="600">举例：</tspan>内存中该字 = 0xbe6d9734，执行 <tspan class="mono">ld.b rd, base, 0x0f42</tspan></text>
+  <text x="40" y="200" font-size="12.2" fill="#5F5E5A">addr[1:0] = 0x42 &amp; 0x3 = <tspan font-weight="600">10</tspan> → 选 byte2 = <tspan font-weight="600">0x97</tspan></text>
+  <text x="40" y="222" font-size="12.2" fill="#5F5E5A">ld.b 为符号扩展 → rd = 0xffffff97　；　若为 ld.bu → rd = 0x00000097</text>
+</svg>
+<div class="cap">图 4B · Load 的两级处理：先按地址选字节/半字，再按指令决定符号或零扩展</div>
+</div>
+
+<h3>3.5 访存接口的三个易错点</h3>
+
+<table>
+<thead><tr><th style="width:170px">问题</th><th>正确做法</th></tr></thead>
+<tbody>
+<tr><td><b>片选何时拉高？</b></td>
+    <td><code>data_sram_en = es_valid &amp;&amp; !flush &amp;&amp; (es_res_from_mem || es_mem_we)</code>。
+        只有真正访存的指令才使能，其余指令必须保持为 0，否则会读到脏数据或误触发写。</td></tr>
+<tr><td><b>地址给几位？</b></td>
+    <td>CPU 侧给完整的 32 位 <code>alu_result</code>；<b>低两位留给字节选择逻辑用</b>，
+        由 SoC（<code>bridge_1x2</code>）截取 <code>[19:2]</code> 再送给 RAM。
+        不要在 CPU 里提前丢掉低两位，否则 st.b / ld.b 就没法选通道了。</td></tr>
+<tr><td><b>写使能与写数据的关系？</b></td>
+    <td>4 位 <code>we</code> 是<b>字节粒度</b>的；写数据用"复制"铺满 32 位，
+        两者配合即可定位到目标字节，<b>不需要动态移位</b>。</td></tr>
+</tbody>
+</table>
+
+<!-- ======================= §4 ======================= -->
+<h2 id="s4">4 · EXP4 / EXP5 / EXP6 各自测了什么（测试点全表）</h2>
+
+<h3>4.1 先说清：一个"测试点"是什么</h3>
+
+<p>func 测试程序位于 <code>mycpu_env/func/</code>，每个指令一个测试函数（<code>inst/nXX_*.S</code>），
+由 <code>init.S</code> 里的 <code>inst_test</code> 依次调用。测试长这样（以 slti 为例）：</p>
+
+<pre><code><span class="cmt">/* 22 */</span>
+<span class="kw">#define</span> TEST_SLTI(in_a, in_b, ref) \
+    LI (t0, in_a); \          <span class="cmt">// ① 把被测操作数装进寄存器</span>
+    LI (v1, ref);  \          <span class="cmt">// ② 把"参考结果"装进另一个寄存器</span>
+    slti v0, t0, in_b; \      <span class="cmt">// ③ 执行被测指令</span>
+    bne v0, v1, inst_error    <span class="cmt">// ④ 不等 → 跳 inst_error（测试失败）</span>
+
+<span class="cmt">// 每个测试函数开头：</span>
+LEAF(n22_slti_test)
+    addi.w s0, s0, 1          <span class="cmt">// 测试点编号 +1（s0 全程累加，用作"进度条"）</span>
+    ...
+    TEST_SLTI(0xd9d129b5, 0x988, 0x1)   <span class="cmt">// 几十组随机数据 + 参考值</span>
+    ...</code></pre>
+
+<div class="box note">
+<b>为什么这么设计？</b>因为<b>没有操作系统、没有 printf</b>。
+测试程序只能靠"执行到第几个测试点"来表达进度：跑完一个测试函数就把 <code>s0</code> 加一，
+testbench 监测到 <code>s0</code> 变化就打印一行
+<code>Number 8'd22 Functional Test Point PASS!!!</code>。
+<b>所以"测试点 PASS 数"＝"被验证通过的指令数"</b>——这也是平台判分的依据。
+</div>
+
+<h3>4.2 测试点 → 指令 → 章节 的对应全表</h3>
+
+<table>
+<thead><tr><th class="mono" style="width:70px">测试点</th><th class="mono" style="width:180px">测试函数</th><th class="mono" style="width:120px">被测指令</th><th style="width:90px">所属章节</th><th class="mono">出现在</th></tr></thead>
+<tbody>
+<tr><td class="mono">1</td><td class="mono">n1_lu12i_w_test</td><td class="mono">lu12i.w</td><td>第 1–2 章（基线 20 条）</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">2</td><td class="mono">n2_add_w_test</td><td class="mono">add.w</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">3</td><td class="mono">n3_addi_w_test</td><td class="mono">addi.w</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">4</td><td class="mono">n4_sub_w_test</td><td class="mono">sub.w</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">5</td><td class="mono">n5_slt_test</td><td class="mono">slt</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">6</td><td class="mono">n6_sltu_test</td><td class="mono">sltu</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">7</td><td class="mono">n7_and_test</td><td class="mono">and</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">8</td><td class="mono">n8_or_test</td><td class="mono">or</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">9</td><td class="mono">n9_xor_test</td><td class="mono">xor</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">10</td><td class="mono">n10_nor_test</td><td class="mono">nor</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">11</td><td class="mono">n11_slli_w_test</td><td class="mono">slli.w</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">12</td><td class="mono">n12_srli_w_test</td><td class="mono">srli.w</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">13</td><td class="mono">n13_srai_w_test</td><td class="mono">srai.w</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">14</td><td class="mono">n14_ld_w_test</td><td class="mono">ld.w</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">15</td><td class="mono">n15_st_w_test</td><td class="mono">st.w</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">16</td><td class="mono">n16_beq_test</td><td class="mono">beq</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">17</td><td class="mono">n17_bne_test</td><td class="mono">bne</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">18</td><td class="mono">n18_bl_test</td><td class="mono">bl</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">19</td><td class="mono">n19_jirl_test</td><td class="mono">jirl</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr><td class="mono">20</td><td class="mono">n20_b_test</td><td class="mono">b</td><td>基线</td><td class="mono">EXP4/5/6</td></tr>
+<tr style="background:#FFFBF0"><td class="mono">21</td><td class="mono">n21_pcaddu12i_test</td><td class="mono">pcaddu12i</td><td><b>第 3 章</b></td><td class="mono">EXP4/5/6</td></tr>
+<tr style="background:#FFFBF0"><td class="mono">22</td><td class="mono">n22_slti_test</td><td class="mono">slti</td><td><b>第 3 章</b></td><td class="mono">EXP4/5/6</td></tr>
+<tr style="background:#FFFBF0"><td class="mono">23</td><td class="mono">n23_sltui_test</td><td class="mono">sltui</td><td><b>第 3 章</b></td><td class="mono">EXP4/5/6</td></tr>
+<tr style="background:#FFFBF0"><td class="mono">24</td><td class="mono">n24_andi_test</td><td class="mono">andi</td><td><b>第 3 章</b></td><td class="mono">EXP4/5/6</td></tr>
+<tr style="background:#FFFBF0"><td class="mono">25</td><td class="mono">n25_ori_test</td><td class="mono">ori</td><td><b>第 3 章</b></td><td class="mono">EXP4/5/6</td></tr>
+<tr style="background:#FFFBF0"><td class="mono">26</td><td class="mono">n26_xori_test</td><td class="mono">xori</td><td><b>第 3 章</b></td><td class="mono">EXP4/5/6</td></tr>
+<tr style="background:#FFFBF0"><td class="mono">27</td><td class="mono">n27_sll_w_test</td><td class="mono">sll.w</td><td><b>第 3 章</b></td><td class="mono">EXP4/5/6</td></tr>
+<tr style="background:#FFFBF0"><td class="mono">28</td><td class="mono">n28_sra_w_test</td><td class="mono">sra.w</td><td><b>第 3 章</b></td><td class="mono">EXP4/5/6</td></tr>
+<tr style="background:#FFFBF0"><td class="mono">29</td><td class="mono">n29_srl_w_test</td><td class="mono">srl.w</td><td><b>第 3 章</b></td><td class="mono">EXP4/5/6</td></tr>
+<tr style="background:#EAF6F3"><td class="mono">37</td><td class="mono">n37_blt_test</td><td class="mono">blt</td><td><b>第 3 章</b></td><td class="mono">EXP5/6</td></tr>
+<tr style="background:#EAF6F3"><td class="mono">38</td><td class="mono">n38_bge_test</td><td class="mono">bge</td><td><b>第 3 章</b></td><td class="mono">EXP5/6</td></tr>
+<tr style="background:#EAF6F3"><td class="mono">39</td><td class="mono">n39_bltu_test</td><td class="mono">bltu</td><td><b>第 3 章</b></td><td class="mono">EXP5/6</td></tr>
+<tr style="background:#EAF6F3"><td class="mono">40</td><td class="mono">n40_bgeu_test</td><td class="mono">bgeu</td><td><b>第 3 章</b></td><td class="mono">EXP5/6</td></tr>
+<tr style="background:#E6F1FB"><td class="mono">41</td><td class="mono">n41_ld_b_test</td><td class="mono">ld.b</td><td><b>第 4 章</b></td><td class="mono">EXP6</td></tr>
+<tr style="background:#E6F1FB"><td class="mono">42</td><td class="mono">n42_ld_h_test</td><td class="mono">ld.h</td><td><b>第 4 章</b></td><td class="mono">EXP6</td></tr>
+<tr style="background:#E6F1FB"><td class="mono">43</td><td class="mono">n43_ld_bu_test</td><td class="mono">ld.bu</td><td><b>第 4 章</b></td><td class="mono">EXP6</td></tr>
+<tr style="background:#E6F1FB"><td class="mono">44</td><td class="mono">n44_ld_hu_test</td><td class="mono">ld.hu</td><td><b>第 4 章</b></td><td class="mono">EXP6</td></tr>
+<tr style="background:#E6F1FB"><td class="mono">45</td><td class="mono">n45_st_b_test</td><td class="mono">st.b</td><td><b>第 4 章</b></td><td class="mono">EXP6</td></tr>
+<tr style="background:#E6F1FB"><td class="mono">46</td><td class="mono">n46_st_h_test</td><td class="mono">st.h</td><td><b>第 4 章</b></td><td class="mono">EXP6</td></tr>
+</tbody>
+</table>
+
+<div class="box ok">
+<b>这张表可以直接背下来当汇报提纲</b>：<br>
+EXP4 = 20 条基线 + 9 条算逻 = <b>29</b> 个测试点<br>
+EXP5 = EXP4 + 4 条转移（blt/bge/bltu/bgeu）= <b>33</b> 个测试点<br>
+EXP6 = EXP5 + 6 条访存（ld.b/ld.h/ld.bu/ld.hu/st.b/st.h）= <b>39</b> 个测试点<br>
+<span class="small">（n30–n36 是第 5 章的乘除法，属于 EXP7，不在本讲义范围内）</span>
+</div>
+
+<h3>4.3 测试是怎么"自动"比对出来的</h3>
+
+<p>测试宏里的 <code>ref</code>（参考值）不是手写出来的，而是<b>由交叉编译器在编译期算好</b>的：
+<code>TEST_SLTI(in_a, in_b, ref)</code> 中 <code>ref</code> 由宿主工具链按 LoongArch 语义计算后作为立即数编进程序。
+CPU 跑出来的 <code>v0</code> 与它不等就跳 <code>inst_error</code>。
+<b>这等于用"另一套独立实现的 LoongArch 语义"给你的 CPU 当阅卷老师</b>，比自己写波形断言可靠得多。</p>
+
+<p>仿真侧还有第二重保险：把 CPU 每条指令的写回结果（<code>debug_wb_pc / debug_wb_rf_wen / wnum / wdata</code>）
+逐拍与官方黄金模型产生的 <code>golden_trace.txt</code> 比对，
+<b>任何一条对不上就立即报错并停在当前 PC</b>，可以直接定位到出错的那条指令。</p>
+
+<!-- ======================= §5 ======================= -->
+<h2 id="s5">5 · 我们的工程：为这两章具体改了什么</h2>
+
+<table>
+<thead><tr><th class="mono" style="width:130px">文件</th><th style="width:90px">章节</th><th>改动内容</th></tr></thead>
+<tbody>
+<tr><td class="mono">ID_stage.v</td><td><b>第 3 章</b></td>
+    <td>新增 13 条指令的译码表达式；立即数分类增加 <code>need_si12</code> / <code>need_ui12</code>；
+        <code>src2_is_imm</code> / <code>src1_is_pc</code> 覆盖新指令；
+        比较逻辑增加 <code>rj_lt_rd</code> / <code>rj_ltu_rd</code>；
+        <code>gr_we</code> 改为"正向或"；<code>ds_use_rj</code> / <code>ds_use_rkd</code> 覆盖新指令（保证前递生效）</td></tr>
+<tr><td class="mono">alu.v</td><td><b>第 3 章</b></td>
+    <td><b>零改动</b>——16 位独热操作码的第 0–11 位已覆盖全部算逻运算，新指令只是换了个"入口"</td></tr>
+<tr><td class="mono">ID_stage.v</td><td><b>第 4 章</b></td>
+    <td>新增 ld.b/ld.h/ld.bu/ld.hu/st.b/st.h 译码；新增汇总信号
+        <code>inst_ld_all</code> / <code>inst_st_all</code>；新增 <code>ds_mem_size[2:0]</code>、
+        <code>ds_ld_signed</code> 并打包进级间总线</td></tr>
+<tr><td class="mono">EXE_stage.v</td><td><b>第 4 章</b></td>
+    <td>新增 store 字节写使能译码（<code>we_byte</code> / <code>we_half</code> / <code>we_word</code>）
+        与写数据复制（<code>wdata_byte</code> / <code>wdata_half</code>）；
+        <code>data_sram_en</code> 改为按 <code>es_res_from_mem || es_mem_we</code> 汇总</td></tr>
+<tr><td class="mono">MEM_stage.v</td><td><b>第 4 章</b></td>
+    <td>解包 <code>mem_size</code> / <code>ld_signed</code>；新增 <code>ld_byte</code> / <code>ld_half</code>
+        两级选取 MUX 与符号/零扩展器；<code>ms_final_result</code> 在 load 时改取 <code>mem_load_data</code></td></tr>
+<tr><td class="mono">mycpu_h.v</td><td>3 + 4 章</td>
+    <td>级间总线位宽随新增字段加宽（<code>DS_TO_ES</code> / <code>ES_TO_MS</code> / <code>MS_TO_WS</code>）</td></tr>
+</tbody>
+</table>
+
+<div class="box dang">
+<b>★ 坑 4：总线加宽后，打包端与解包端必须同步逐位对齐。</b><br>
+这是本项目最阴险的一类 bug：<b>综合不报错、仿真前期也可能不报错</b>，
+只在某几条指令上算出莫名其妙的值。铁律是——
+<b>改一端必须立刻改另一端，并数一遍总位数是否仍等于宏定义的位宽。</b><br>
+<code>ds_to_es_bus</code>（ID 打包）与 <code>{...} = ds_to_es_bus_r</code>（EXE 解包）必须
+<b>字段顺序完全一致</b>；ES→MS、MS→WS 同理。
+</div>
+
+<!-- ======================= §6 ======================= -->
+<h2 id="s6">6 · 怎么验证：黄金 trace 比对 + 上板</h2>
+
+<h3>6.1 两条通路吃的是两个不同的文件（最重要）</h3>
+
+<div class="fig">
+<svg viewBox="0 0 900 290" role="img" aria-label="仿真通路与上板通路">
+  <title>仿真的 mif 通路与上板的 coe 通路</title>
+  <desc>仿真时 sync_ram.v 读 func/obj/inst_ram.mif；综合上板时 Xilinx IP 读 inst_ram.coe 并生成 OOC dcp</desc>
+  <defs>
+    <marker id="ar6" markerWidth="9" markerHeight="9" refX="8" refY="3.2" orient="auto">
+      <path d="M0,0 L8,3.2 L0,6.4 z" fill="#185FA5"/></marker>
+  </defs>
+
+  <!-- 上：仿真 -->
+  <rect x="24" y="30" width="852" height="104" rx="12" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.6"/>
+  <text x="44" y="54" font-size="13.2" font-weight="600" fill="#0B3D6B">通路 A · 行为仿真</text>
+  <g font-size="12.2" fill="#5F5E5A">
+    <rect x="44" y="64" width="200" height="52" rx="8" fill="#FFFFFF" stroke="#85B7EB" stroke-width="0.5"/>
+    <text x="144" y="84" text-anchor="middle" fill="#2C2C2A">testbench/sync_ram.v</text>
+    <text x="144" y="104" text-anchor="middle">行为级 RAM（同名覆盖 IP）</text>
+    <text x="270" y="90">＋ $readmemb 读</text>
+    <text x="270" y="108"><tspan class="mono">func/obj/inst_ram.mif</tspan></text>
+    <text x="470" y="90">→ 与 <tspan class="mono">golden_trace.txt</text></text> 逐条比对</text>
+    <text x="470" y="108">→ 打印 <tspan class="mono">Number 8'dNN ... PASS!!!</tspan></text>
+  </g>
+
+  <!-- 下：上板 -->
+  <rect x="24" y="152" width="852" height="104" rx="12" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.6"/>
+  <text x="44" y="176" font-size="13.2" font-weight="600" fill="#173404">通路 B · 综合出 bit（上板）</text>
+  <g font-size="12.2" fill="#5F5E5A">
+    <rect x="44" y="186" width="200" height="52" rx="8" fill="#FFFFFF" stroke="#97C459" stroke-width="0.5"/>
+    <text x="144" y="206" text-anchor="middle" fill="#2C2C2A">xilinx_ip/inst_ram（blk_mem_gen）</text>
+    <text x="144" y="226" text-anchor="middle">256 × RAMB36E1</text>
+    <text x="270" y="200">＋ Coe_File →</text>
+    <text x="270" y="218"><tspan class="mono">func/obj/inst_ram.coe</tspan></text>
+    <text x="470" y="200">→ 必须 Reset + Generate IP，</text>
+    <text x="470" y="218">　 再显式重跑 <tspan class="mono">inst_ram_synth_1</tspan></text>
+  </g>
+</svg>
+<div class="cap">图 6A · 两条通路：仿真读 .mif，出 bit 读 .coe（经 OOC 综合烧进 dcp）</div>
+</div>
+
+<div class="box dang">
+<b>★ 坑 5（本项目历史上最贵的一个坑）：只换 coe 不出新 bit。</b><br>
+Xilinx IP 采用 OOC（Out-Of-Context）综合，真正把程序烧进 BRAM 的是
+<code>loongson.runs/inst_ram_synth_1/inst_ram.dcp</code>。
+如果只用 <code>generate_target</code> 而不显式 <code>reset_run</code> + <code>launch_runs inst_ram_synth_1</code>，
+<b>dcp 不会重新生成</b>，于是"镜像换了、bit 没换"——
+历史上所有 bit 里固化的一直是第一套程序，评测平台按各章测试点判分，结果每章都是同一个分数。
+<br><br>
+<b>因此换章必须先跑 <code>bash .workbuddy/sim/switch_exp.sh &lt;N&gt;</code>：</b>
+它一次同步三个位置（<code>func/obj/inst_ram.coe</code> 综合用、
+<code>func/obj/inst_ram.mif</code> 仿真用、<code>xilinx_ip/inst_ram/inst_ram.mif</code> 供 generate_target 读），
+自动备份旧状态并逐项 <code>cmp</code> 校验。
+</div>
+
+<h3>6.2 一键命令清单</h3>
+
+<table>
+<thead><tr><th style="width:210px">想做什么</th><th class="mono">命令</th></tr></thead>
+<tbody>
+<tr><td>① 切换到第 N 套镜像</td><td class="mono">bash .workbuddy/sim/switch_exp.sh N</td></tr>
+<tr><td>② 重生成黄金 trace（秒级）</td><td class="mono">vivado -mode batch -source .workbuddy/sim/gt_expN.tcl -tclargs N</td></tr>
+<tr><td>③ 跑行为仿真</td><td class="mono">vivado -mode batch -source .workbuddy/sim/verify_expN_sim.tcl -tclargs N</td></tr>
+<tr><td>④ 出 bit（约 10–13 分钟）</td><td class="mono">vivado -mode batch -source .workbuddy/sim/rebuild_bit_expN.tcl -tclargs N</td></tr>
+<tr><td>④′ 出 bit（双击，默认 EXP6）</td><td class="mono">build_bit_exp.bat N</td></tr>
+<tr><td>⑤ 全量回归 ex1–ex7</td><td class="mono">bash .workbuddy/sim/run_regress.sh</td></tr>
+</tbody>
+</table>
+
+<div class="box warn">
+<b>★ 坑 6：<code>launch_simulation</code> 默认只跑 1000 ns。</b><br>
+而本工程的复位就要 2000 ns，跑 1000 ns 什么都看不到。
+所以 gt_expN.tcl / verify_expN_sim.tcl 里都在 <code>launch_simulation</code> 之后补了一句
+<code>run 5 ms</code>。自己写脚本时务必记得这一步。
+</div>
+
+<h3>6.3 判据：看什么算通过</h3>
+
+<pre><code><span class="cmt">// testbench 打印（mycpu_tb.v）</span>
+----[           123456 ns] Number 8'd22 Functional Test Point PASS!!!   <span class="cmt">// 每通过一个测试点打印一行</span>
+...
+----PASS!!!                                                            <span class="cmt">// 全部通过</span>
+
+<span class="cmt">// 失败时</span>
+Error!!!  ref_pc = 0x1c0081f0  my_pc = 0x1c0081e4   <span class="cmt">// 立刻停在出错的 PC，可直接定位</span></code></pre>
+
+<h3>6.4 本项目实测结果</h3>
+
+<table>
+<thead><tr><th style="width:90px">实验</th><th class="mono" style="width:110px">golden_trace 行数</th><th class="mono" style="width:110px">测试点 PASS</th><th>备注</th></tr></thead>
+<tbody>
+<tr><td><b>EXP4</b></td><td class="mono">62377</td><td class="mono">29 / 29</td><td>第 3 章算逻（20 基线 + 9 新指令）</td></tr>
+<tr><td><b>EXP5</b></td><td class="mono">71332</td><td class="mono">33 / 33</td><td>+ 4 条转移</td></tr>
+<tr><td><b>EXP6</b></td><td class="mono">79750</td><td class="mono">39 / 39</td><td>+ 6 条访存；bit 已生成（WNS +0.782 ns，违例 0/10442）</td></tr>
+<tr><td class="mono">EXP7</td><td class="mono">86846</td><td class="mono">46 / 46</td><td>第 5 章乘除（超出本讲义范围）</td></tr>
+<tr><td class="mono">EXP8</td><td class="mono">87100</td><td class="mono">47 / 47</td><td>第 6 章异常（最新 RTL，仿真全过）</td></tr>
+</tbody>
+</table>
+
+<p class="small">说明：PASS 计数取自仿真日志中 <code>Functional Test Point PASS</code> 的行数，
+与评测平台"第 3 章 29 点 / 第 4 章 39 点"的判分口径一致。
+当前 RTL 已推进到第 6 章（含 <code>csr.v</code>），因此 EXP4/5/6 也是用这份最新 RTL 跑的回归，
+结果只可能更好，不会更差。</p>
+
+<!-- ======================= §7 ======================= -->
+<h2 id="s7">7 · 汇报要点与老师常问的 8 个问题</h2>
+
+<h3>7.1 三分钟汇报骨架</h3>
+
+<ol>
+<li><b>先定位</b>：实验二做的是"指令集扩展"，不是结构改动；五级流水一行没动，ALU 一行没改。</li>
+<li><b>第 3 章</b>：13 条指令（9 算逻 + 4 转移）全部复用已有通路，只改 ID 级译码与立即数扩展；
+    重点讲 <code>sltui</code> 的 si12 陷阱。</li>
+<li><b>第 4 章</b>：6 条访存指令引入"宽度 + 符号"两个维度；
+    store 用字节写使能 + 写数据复制，load 在 MEM 级做两级 MUX + 扩展。</li>
+<li><b>验证</b>：仿真走 mif + 黄金 trace 逐条比对，上板走 coe + OOC dcp；
+    EXP4/5/6 分别对应 29 / 33 / 39 个测试点，全部通过。</li>
+<li><b>升华</b>：体会"数据通路复用"与"控制信号收敛"两个设计原则。</li>
+</ol>
+
+<h3>7.2 老师常问的 8 个问题</h3>
+
+<div class="box ask">
+<b>Q1：为什么 sll.w 和 slli.w 可以共用同一个 ALU 运算？</b><br>
+因为 ALU 只看 <code>alu_src2</code> 的低 5 位（<code>shift_amt = alu_src2[4:0]</code>），
+至于这个 5 位来自指令的 ui5 字段还是来自 rk 寄存器，是 ID 级 <code>src2_is_imm</code> 决定的事。
+<b>通路相同、来源不同</b>——这就是复用的本质。
+</div>
+
+<div class="box ask">
+<b>Q2：pcaddu12i 和 lu12i.w 的区别？</b><br>
+立即数通路完全一样（都是 <code>{i20, 12'b0}</code>），区别只在 ALU 源 1：
+<code>lu12i.w</code> 用 0（结果 = imm&lt;&lt;12），<code>pcaddu12i</code> 用 PC（结果 = PC + imm&lt;&lt;12）。
+所以硬件上只多了一个 <code>src1_is_pc</code> 多路选择器。
+</div>
+
+<div class="box ask">
+<b>Q3：blt 和 bltu 硬件上差在哪？</b><br>
+差在比较器：<code>$signed(a) &lt; $signed(b)</code> 与 <code>a &lt; b</code>。
+前者看补码符号位，后者纯按数值二进制比。
+典型对照：<code>a = 0xffffffff, b = 0x00000001</code> 时，
+blt 成立（−1 &lt; 1），bltu 不成立（4294967295 &gt; 1）。
+</div>
+
+<div class="box ask">
+<b>Q4：为什么 ld 的字节选取必须放在 MEM 级？</b><br>
+因为本设计的 data RAM 是<b>同步读</b>：EXE 级给出地址，
+数据在 MEM 级那拍才出现在 <code>data_sram_rdata</code> 上。
+没有数据就无从选取，所以选取与扩展只能跟在 MEM 级。
+（若强行挪到 EXE 级，就得"提前一拍猜数据"，做不到。）
+</div>
+
+<div class="box ask">
+<b>Q5：st.b 为什么不直接把数据左移到位？</b><br>
+能这么做，但代价是一个 32 位动态移位器（两级 LUT + 进位链）。
+改用"复制 4 份 + 4 位字节写使能"后，<b>移位逻辑彻底消失</b>，
+BRAM 的每个字节通道都收到相同数据，由 we 决定谁真正写入。
+这是"用存储器的字节使能换逻辑资源"的典型技巧。
+</div>
+
+<div class="box ask">
+<b>Q6：加新指令时，最怕漏改什么地方？</b><br>
+三处：<b>① 译码表达式</b>（尤其是 opcode 只差一两位的指令对，如 <code>ertn=06483800</code> 与
+<code>tlbwr=06483000</code> 只差 bit12，必须整体比对而不是位域匹配）；
+<b>② 前递相关的 <code>ds_use_rj</code> / <code>ds_use_rkd</code></b>（漏了就用旧值）；
+<b>③ <code>gr_we</code></b>（漏了就不写回，或更糟——用反向屏蔽写法时误写回垃圾值）。
+</div>
+
+<div class="box ask">
+<b>Q7：仿真和上板为什么会不一致？</b><br>
+因为它们<b>不吃同一个文件</b>。仿真用行为级 <code>sync_ram.v</code> 读 <code>func/obj/inst_ram.mif</code>；
+出 bit 用 Xilinx IP 读 <code>func/obj/inst_ram.coe</code>，还要经 OOC 综合生成 <code>inst_ram.dcp</code>。
+任何一边漏同步（尤其是只 generate_target 而没重跑 OOC）就会出现"仿真对、上板错"。
+正确做法：换章统一走 <code>switch_exp.sh</code>。
+</div>
+
+<div class="box ask">
+<b>Q8：怎么证明 bit 里装的就是这一章的程序？</b><br>
+可以反向验证：从 <code>inst_ram_synth_1/inst_ram.dcp</code> 导出 256 个 RAMB36E1 的
+<code>INIT_01</code> 初值，与由 coe 推导出的期望值做多重集比对。
+布局模型是 64 block × 4 byte-lane，每个 RAMB36 存 4096 字中的一个字节通道，
+<code>INIT_k</code> 覆盖 block 内字 <code>[32k … 32k+31]</code>，
+字节序为 <code>b[31−j] = word(base+j)</code> 的第 lane 字节。
+<br><span class="small">⚠ 注意：ex4/ex5/ex6 三套程序前 8223 字完全相同，
+必须取 <code>word[8224]</code> 之后的数据才判别得出来。</span>
+</div>
+
+<hr>
+
+<p class="small center">—— 第 3–4 章讲义完 ——<br>
+配套：第 1–2 章讲义（流水线骨架与冲突处理）· 后续：第 5 章（乘除法）、第 6 章（异常与 CSR）</p>
+
+</div>
+</body>
+</html>

@@ -15,6 +15,9 @@ module MEM_stage(
     // ---------------- 接收来自数据 RAM 的读数据 ----------------
     input  wire [31:0]                  data_sram_rdata,
 
+    // ---------------- 第 6 章：异常清空 ----------------
+    input  wire                         flush,          // 写回级报出异常 / ERTN，本级指令作废
+
     // ---------------- 数据前递（转发）接口 ----------------
     output wire                         ms_forward_valid,
     output wire [ 4:0]                  ms_forward_dest,
@@ -39,6 +42,8 @@ module MEM_stage(
     always @(posedge clk) begin
         if (reset) begin
             ms_valid <= 1'b0;
+        end else if (flush) begin
+            ms_valid <= 1'b0;          // 第 6 章：异常/ERTN 时作废本级指令
         end else if (ms_allowin) begin
             ms_valid <= es_to_ms_valid;
         end
@@ -51,6 +56,8 @@ module MEM_stage(
     // ==========================================
     // 2. 解包来自 EXE 级的总线（与 EXE_stage 打包顺序一致）
     // ==========================================
+    wire        ms_ertn;        // 第 6 章：ERTN 指令
+    wire [ 5:0] ms_ex_flags;    // 第 6 章扩展档：异常标志组 {adef,ale,sys,brk,ine,int}
     wire        ms_res_from_mem;
     wire        ms_gr_we;
     wire [ 2:0] ms_mem_size;    // 1=字节 2=半字 4=字
@@ -60,6 +67,8 @@ module MEM_stage(
     wire [31:0] ms_pc;
 
     assign {
+        ms_ertn,         // 1 bit
+        ms_ex_flags,     // 6 bit
         ms_res_from_mem, // 1 bit
         ms_gr_we,        // 1 bit
         ms_mem_size,     // 3 bit
@@ -93,12 +102,17 @@ module MEM_stage(
                                                     {16'b0,             ld_half}) :
                                     data_sram_rdata;   // 字访问直接取整字
 
-    wire [31:0] ms_final_result = ms_res_from_mem ? mem_load_data : ms_alu_result;
+    // 第 6 章扩展档：ALE 指令的"结果"是 EXE 级塞进来的出错访存地址（供 BADV 用），
+    // 必须原样传下去，不能被 load 的字节选取逻辑覆盖掉。
+    wire [31:0] ms_final_result = ms_ex_flags[4] ? ms_alu_result :
+                                  ms_res_from_mem ? mem_load_data : ms_alu_result;
 
     // ==========================================
     // 4. 打包总线并传递给 WB 阶段
     // ==========================================
     assign ms_to_ws_bus = {
+        ms_ertn,         // 1 bit:  ERTN（写回级据此触发 ertn_flush）
+        ms_ex_flags,     // 6 bit:  异常标志组 {adef,ale,sys,brk,ine,int}
         ms_gr_we,        // 1 bit: 寄存器写回使能
         ms_dest,         // 5 bit: 目标寄存器号
         ms_final_result, // 32 bit: 最终写回数据

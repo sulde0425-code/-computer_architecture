@@ -74,6 +74,69 @@ module mycpu_top(
     wire [31:0] ws_forward_data;
 
     // ==========================================
+    // 第 6 章：控制状态寄存器（CSR）与异常通路
+    // ==========================================
+    // 指令访问接口（由 EXE 级驱动，读写都在 EXE 级完成）
+    wire        csr_re;
+    wire [13:0] csr_num;
+    wire [31:0] csr_rvalue;
+    wire        csr_we;
+    wire [31:0] csr_wmask;
+    wire [31:0] csr_wvalue;
+
+    // 与处理器内部硬件直接交互的接口
+    wire [31:0] ex_entry;      // 异常处理程序入口地址
+    wire [31:0] era_pc;        // ERTN 返回地址
+    wire        has_int;       // 核内中断有效
+    // 第 6 章扩展档：定时器 / 稳定计数器 / TID
+    wire [63:0] counter;       // 64 位稳定计数器（rdcntvl.w / rdcntvh.w）
+    wire [31:0] tid;           // CSR.TID（rdcntid）
+    // 本 SoC 没有外部中断引脚，硬中断与核间中断恒 0
+    // （定时器中断与两个软中断由 CSR 内部产生，不受此影响）
+    wire [ 7:0] hw_int_in = 8'b0;
+    wire        ipi_int_in = 1'b0;
+
+    wire        wb_ex;         // 写回级报出异常
+    wire [ 5:0] wb_ecode;
+    wire [ 8:0] wb_esubcode;
+    wire [31:0] wb_pc;
+    wire [31:0] wb_badv;
+    wire        wb_ertn_flush; // ERTN 在写回级执行有效
+
+    // 全局清空：异常与 ERTN 都会清空所有流水级并改指取指 PC
+    wire        flush        = wb_ex | wb_ertn_flush;
+    wire [31:0] flush_pc     = wb_ex ? ex_entry : era_pc;
+
+    // 控制状态寄存器模块
+    csr u_csr (
+        .clk         (clk        ),
+        .reset       (reset      ),
+
+        .csr_re      (csr_re     ),
+        .csr_num     (csr_num    ),
+        .csr_rvalue  (csr_rvalue ),
+        .csr_we      (csr_we     ),
+        .csr_wmask   (csr_wmask  ),
+        .csr_wvalue  (csr_wvalue ),
+
+        .ex_entry    (ex_entry   ),
+        .era_pc      (era_pc     ),
+        .has_int     (has_int    ),
+        .counter     (counter    ),
+        .tid         (tid        ),
+
+        .hw_int_in   (hw_int_in  ),
+        .ipi_int_in  (ipi_int_in ),
+
+        .ertn_flush  (wb_ertn_flush),
+        .wb_ex       (wb_ex      ),
+        .wb_ecode    (wb_ecode   ),
+        .wb_esubcode (wb_esubcode),
+        .wb_pc       (wb_pc      ),
+        .wb_badv     (wb_badv    )
+    );
+
+    // ==========================================
     // 五级流水线各个阶段例化
     // ==========================================
 
@@ -86,6 +149,8 @@ module mycpu_top(
         .fs_to_ds_valid  (fs_to_ds_valid),
         .fs_to_ds_bus    (fs_to_ds_bus),
 
+        .flush           (flush),
+        .flush_pc        (flush_pc),
         .br_bus          (br_bus),
 
         .inst_sram_en    (inst_sram_en),
@@ -117,6 +182,10 @@ module mycpu_top(
         .es_is_div        (es_is_div),
         .es_div_ready     (es_div_ready),
         .es_is_mul        (es_is_mul),
+        .es_is_csr        (es_is_csr),
+        .has_int          (has_int),      // 第 6 章扩展档：中断有效
+        .counter          (counter),      // 第 6 章扩展档：稳定计数器
+        .tid              (tid),          // 第 6 章扩展档：CSR.TID
         .ms_forward_valid (ms_forward_valid),
         .ms_forward_dest  (ms_forward_dest),
         .ms_forward_data  (ms_forward_data),
@@ -124,7 +193,9 @@ module mycpu_top(
         .ms_forward_data_alu (ms_forward_data_alu),
         .ws_forward_valid (ws_forward_valid),
         .ws_forward_dest  (ws_forward_dest),
-        .ws_forward_data  (ws_forward_data)
+        .ws_forward_data  (ws_forward_data),
+
+        .flush           (flush)
     );
 
     // 执行级 (EXE)
@@ -150,7 +221,17 @@ module mycpu_top(
         .es_is_load       (es_is_load),
         .es_is_div        (es_is_div),
         .es_div_ready     (es_div_ready),
-        .es_is_mul        (es_is_mul)
+        .es_is_mul        (es_is_mul),
+        .es_is_csr        (es_is_csr),
+
+        .csr_re          (csr_re),
+        .csr_num         (csr_num),
+        .csr_rvalue      (csr_rvalue),
+        .csr_we          (csr_we),
+        .csr_wmask       (csr_wmask),
+        .csr_wvalue      (csr_wvalue),
+
+        .flush           (flush)
     );
 
     // 访存级 (MEM)
@@ -158,6 +239,7 @@ module mycpu_top(
         .clk             (clk),
         .reset           (reset),
 
+        .flush           (flush),
         .ws_allowin      (ws_allowin),
         .ms_allowin      (ms_allowin),
         .es_to_ms_valid  (es_to_ms_valid),
@@ -192,7 +274,14 @@ module mycpu_top(
 
         .ws_forward_valid (ws_forward_valid),
         .ws_forward_dest  (ws_forward_dest),
-        .ws_forward_data  (ws_forward_data)
+        .ws_forward_data  (ws_forward_data),
+
+        .wb_ex           (wb_ex),
+        .wb_ecode        (wb_ecode),
+        .wb_esubcode     (wb_esubcode),
+        .wb_pc           (wb_pc),
+        .wb_badv         (wb_badv),
+        .wb_ertn_flush   (wb_ertn_flush)
     );
 
 endmodule

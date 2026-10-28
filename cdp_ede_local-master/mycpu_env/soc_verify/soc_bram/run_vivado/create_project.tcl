@@ -11,6 +11,11 @@ add_files -quiet [glob -nocomplain ../rtl/xilinx_ip/*/*.xci]
 add_files -fileset sim_1 ../testbench
 
 # Add myCPU
+# 注意：这里必须逐个 .v 显式列出，不能只给目录。只给目录时 Vivado 只在
+# 首次建工程时扫描一次，之后往 myCPU/ 里新增的源文件（例如第 6 章的 csr.v）
+# 不会被自动发现，仿真会报 "Module <xxx> not found"。
+add_files -scan_for_includes [glob -nocomplain ../../../myCPU/*.v]
+# 保险起见仍保留目录形式，便于 Vivado 自行核对
 add_files -scan_for_includes ../../../myCPU
 
 # Add constraints

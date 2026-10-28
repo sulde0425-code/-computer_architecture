@@ -80,6 +80,8 @@ Thumbs.db
 .workbuddy/backup/
 .workbuddy/tmp/
 .workbuddy/sim/exp*/
+# bram_init_exp*.txt 是"验证 bit 里固化了哪套程序"时的一次性导出，可随时重建
+.workbuddy/sim/bram_init_exp*.txt
 .workbuddy/sim/mycpu_env/
 .workbuddy/sim/rtl_mycpu/
 .workbuddy/sim/synthchk/
